@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using NovaWallet.Api.Errors;
 using NovaWallet.Infrastructure;
 using NovaWallet.Infrastructure.Persistence;
 
@@ -8,7 +10,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddNovaWalletProblemDetails();
 builder.Services.AddHealthChecks();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    // The web defaults accept numbers written as strings; amounts must be real JSON integers.
+    options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 var app = builder.Build();
 
@@ -22,7 +31,11 @@ if (args.Contains(MigrateArgument))
     return;
 }
 
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapControllers();
 
 app.Run();
 

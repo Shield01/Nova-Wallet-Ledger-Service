@@ -89,6 +89,7 @@ public class NovaWalletApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
         {
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
+            services.AddControllers().AddApplicationPart(typeof(TestOnlyController).Assembly);
         });
     }
 }
