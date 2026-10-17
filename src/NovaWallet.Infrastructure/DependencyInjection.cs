@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NovaWallet.Application.Wallets;
 using NovaWallet.Infrastructure.Persistence;
+using NovaWallet.Infrastructure.Persistence.Stores;
 
 namespace NovaWallet.Infrastructure;
 
@@ -16,6 +18,7 @@ public static class DependencyInjection
                     $"Set ConnectionStrings__{DatabaseSetup.RuntimeConnectionName}.");
             DatabaseSetup.Configure(options, connectionString);
         });
+        services.AddScoped<IWalletStore, WalletStore>();
         return services;
     }
 }
