@@ -1,2 +1,15 @@
 # Agent harness (kept private)
 .agent-harness/
+
+# Build output
+bin/
+obj/
+TestResults/
+*.trx
+
+# Local configuration and secrets
+.env
+*.user
+.vs/
+.idea/
+.vscode/

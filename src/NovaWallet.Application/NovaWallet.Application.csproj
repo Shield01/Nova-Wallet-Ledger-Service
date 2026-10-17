@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\NovaWallet.Domain\NovaWallet.Domain.csproj" />
+  </ItemGroup>
+</Project>
