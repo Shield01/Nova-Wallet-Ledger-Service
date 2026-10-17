@@ -59,20 +59,31 @@ public class ProblemDetailsTests(NovaWalletApiFactory factory) : IClassFixture<N
     }
 
     [Fact]
-    public async Task Unknown_route_returns_not_found_problem()
+    public async Task Unknown_route_returns_not_found_problem_to_an_authenticated_caller()
     {
-        var response = await factory.CreateClient().GetAsync("/no/such/route");
+        var response = await AuthenticatedClient().GetAsync("/no/such/route");
 
         await response.AssertProblemAsync(HttpStatusCode.NotFound, "NOT_FOUND");
     }
 
     [Fact]
+    public async Task Unknown_route_reveals_nothing_to_an_anonymous_caller()
+    {
+        var response = await factory.CreateClient().GetAsync("/no/such/route");
+
+        await response.AssertProblemAsync(HttpStatusCode.Unauthorized, "UNAUTHENTICATED");
+    }
+
+    [Fact]
     public async Task Unsupported_method_returns_405_problem()
     {
-        var response = await factory.CreateClient().DeleteAsync("/test/validate");
+        var response = await AuthenticatedClient().DeleteAsync("/test/validate");
 
         await response.AssertProblemAsync(HttpStatusCode.MethodNotAllowed, "METHOD_NOT_ALLOWED");
     }
+
+    private HttpClient AuthenticatedClient() =>
+        factory.CreateClient().WithBearer(factory.Tokens.For("problem-tester", TestTokens.WalletScope));
 
     [Fact]
     public async Task Unsupported_content_type_returns_415_problem()

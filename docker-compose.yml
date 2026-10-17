@@ -1,6 +1,7 @@
 # Development stack: `docker compose up --build`.
-# Passwords and the signing key below are development-only defaults. Override them through
-# environment variables or a .env file (see .env.example) for anything beyond local use.
+# Passwords and the signing key below are development-only defaults. Override them with
+# environment variables or a .env file (see .env.example). The API refuses to start in
+# Production with the default signing key.
 name: novawallet
 
 services:
@@ -8,14 +9,15 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: novawallet
-      POSTGRES_USER: novawallet_owner
-      POSTGRES_PASSWORD: ${NOVAWALLET_OWNER_PASSWORD:-owner-dev-password}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-dev-password}
+      NOVAWALLET_OWNER_PASSWORD: ${NOVAWALLET_OWNER_PASSWORD:-owner-dev-password}
       NOVAWALLET_APP_PASSWORD: ${NOVAWALLET_APP_PASSWORD:-app-dev-password}
     volumes:
       - ./deploy/db/init:/docker-entrypoint-initdb.d:ro
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U novawallet_owner -d novawallet"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d novawallet"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -35,6 +37,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Ledger: "Host=db;Database=novawallet;Username=novawallet_app;Password=${NOVAWALLET_APP_PASSWORD:-app-dev-password}"
+      Auth__SigningKey: ${NOVAWALLET_SIGNING_KEY:-dev-only-signing-key-do-not-use-in-production-0123456789}
+      Auth__DevIssuer__Enabled: "true"
     ports:
       - "8080:8080"
     depends_on:

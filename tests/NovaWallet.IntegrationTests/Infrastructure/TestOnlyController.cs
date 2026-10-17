@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ namespace NovaWallet.IntegrationTests.Infrastructure;
 /// <summary>Endpoints that exist only in the test host, to exercise cross-cutting behaviour.</summary>
 [ApiController]
 [Route("test")]
+[AllowAnonymous]
 public sealed class TestOnlyController : ControllerBase
 {
     public const string SecretMessage = "secret-internal-detail-7f3a";

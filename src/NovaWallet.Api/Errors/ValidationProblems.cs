@@ -14,7 +14,7 @@ public static class ValidationProblems
         return Create(context.HttpContext, errors);
     }
 
-    public static IActionResult Create(HttpContext httpContext, IDictionary<string, string[]> errors)
+    public static ValidationProblemDetails Build(HttpContext httpContext, IDictionary<string, string[]> errors)
     {
         var problem = new ValidationProblemDetails(errors)
         {
@@ -24,6 +24,12 @@ public static class ValidationProblems
         };
         problem.Extensions[ProblemDetailsSetup.CodeExtension] = ErrorCodes.ValidationFailed;
         ProblemDetailsSetup.Complete(problem, httpContext);
+        return problem;
+    }
+
+    public static IActionResult Create(HttpContext httpContext, IDictionary<string, string[]> errors)
+    {
+        var problem = Build(httpContext, errors);
         return new ObjectResult(problem)
         {
             StatusCode = StatusCodes.Status400BadRequest,
