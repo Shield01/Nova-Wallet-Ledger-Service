@@ -28,6 +28,9 @@ public static class AuthSetup
             {
                 var settings = auth.Value;
                 options.MapInboundClaims = false;
+
+                // Don't tell a caller which check their token failed (signature, audience, expiry).
+                options.IncludeErrorDetails = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidIssuer = settings.Issuer,

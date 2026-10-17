@@ -4,7 +4,6 @@ using NovaWallet.Api.Auth;
 using NovaWallet.Api.Contracts;
 using NovaWallet.Api.Errors;
 using NovaWallet.Api.Idempotency;
-using NovaWallet.Application.Idempotency;
 using NovaWallet.Application.Ledger;
 
 namespace NovaWallet.Api.Controllers;
@@ -30,13 +29,12 @@ public sealed class CreditsController(CreditService credits) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
     public async Task<IResult> Credit(Guid walletId, CreditRequest request, CancellationToken cancellationToken)
     {
-        var key = IdempotencyHttp.ReadKey(Request);
-        if (IdempotentRequest.Validate(key) is { } invalidKey)
+        if (!IdempotencyHttp.TryReadKey(Request, out var key, out var invalidKey))
         {
-            return invalidKey.ToProblem(HttpContext);
+            return invalidKey!.ToProblem(HttpContext);
         }
 
-        var outcome = await credits.CreditAsync(walletId, request.AmountKobo, key!, cancellationToken);
+        var outcome = await credits.CreditAsync(walletId, request.AmountKobo, key, cancellationToken);
         return IdempotencyHttp.Render(outcome, HttpContext, result =>
             Results.Json(CreditResponse.From(result), statusCode: StatusCodes.Status201Created));
     }

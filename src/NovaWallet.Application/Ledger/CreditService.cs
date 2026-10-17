@@ -39,7 +39,7 @@ public sealed class CreditService(
     private async Task<Result<CreditResult>> PostAsync(Guid walletId, long amountKobo, CancellationToken cancellationToken)
     {
         var locked = await wallets.LockAsync([walletId, Wallet.SystemAccountId], cancellationToken);
-        var now = clock.GetUtcNow();
+        var now = clock.GetStoredUtcNow();
 
         var target = locked.SingleOrDefault(w => w.Id == walletId && !w.IsSystemAccount);
         if (target is null)

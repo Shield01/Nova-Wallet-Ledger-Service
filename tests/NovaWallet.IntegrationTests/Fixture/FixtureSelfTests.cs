@@ -42,7 +42,14 @@ public class FixtureSelfTests(NovaWalletApiFactory factory) : IClassFixture<Nova
         await other.InitializeAsync();
         try
         {
-            Assert.NotEqual(factory.DatabaseName, other.DatabaseName);
+            var customerId = $"isolation-{Guid.NewGuid():N}"[..30];
+            await factory.CreateWalletAsync(customerId);
+
+            await using var connection = new NpgsqlConnection(other.OwnerConnectionString);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand("SELECT count(*) FROM wallets WHERE customer_id = @c", connection);
+            command.Parameters.AddWithValue("c", customerId);
+            Assert.Equal(0L, (long)(await command.ExecuteScalarAsync())!);
         }
         finally
         {

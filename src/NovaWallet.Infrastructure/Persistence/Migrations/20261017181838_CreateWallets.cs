@@ -40,8 +40,16 @@ namespace NovaWallet.Infrastructure.Persistence.Migrations
                 VALUES ('00000000-0000-0000-0000-000000000001', NULL, 'SYSTEM', 0, now());
                 """);
 
-            // Balances change, so the runtime role may update wallets, but never delete them.
-            migrationBuilder.Sql("GRANT SELECT, INSERT, UPDATE ON wallets TO novawallet_app;");
+            // The runtime may open wallets and change balances, nothing else: it can't reassign a
+            // wallet, change its kind (escaping the non-negative check) or delete it.
+            migrationBuilder.Sql("GRANT SELECT, INSERT ON wallets TO novawallet_app;");
+            migrationBuilder.Sql("GRANT UPDATE (balance_kobo) ON wallets TO novawallet_app;");
+
+            // There is exactly one system account, with the fixed id.
+            migrationBuilder.Sql("""
+                ALTER TABLE wallets ADD CONSTRAINT ck_wallets_single_system_account
+                    CHECK (kind <> 'SYSTEM' OR id = '00000000-0000-0000-0000-000000000001');
+                """);
         }
 
         /// <inheritdoc />

@@ -50,7 +50,7 @@ public sealed class TransferService(
     {
         // Both rows are locked, in ascending id order, before any balance is read.
         var locked = await wallets.LockAsync([sourceWalletId, destinationWalletId], cancellationToken);
-        var now = clock.GetUtcNow();
+        var now = clock.GetStoredUtcNow();
 
         var source = locked.SingleOrDefault(w => w.Id == sourceWalletId);
         if (source is null || !source.IsOwnedBy(caller.Subject))

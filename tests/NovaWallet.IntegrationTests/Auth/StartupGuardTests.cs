@@ -18,6 +18,36 @@ public class StartupGuardTests(NovaWalletApiFactory factory) : IClassFixture<Nov
     }
 
     [Fact]
+    public void Committed_development_key_stops_any_non_development_startup()
+    {
+        var error = StartupFailure("Staging", new()
+        {
+            ["Auth:DevIssuer:Enabled"] = "false",
+            ["Auth:SigningKey"] = ComposeDevelopmentKey,
+        });
+
+        Assert.Contains("development default", error);
+    }
+
+    [Fact]
+    public void Missing_signing_key_stops_startup()
+    {
+        var error = StartupFailure("Development", new() { ["Auth:SigningKey"] = "" });
+
+        Assert.Contains("Auth:SigningKey", error);
+    }
+
+    [Fact]
+    public void Thirty_one_byte_key_is_refused_and_thirty_two_bytes_start()
+    {
+        var error = StartupFailure("Development", new() { ["Auth:SigningKey"] = new string('k', 31) });
+        using var ok = factory.WithSettings(new Dictionary<string, string?> { ["Auth:SigningKey"] = new string('k', 32) });
+
+        Assert.Contains("at least 32 bytes", error);
+        Assert.NotNull(ok.CreateClient());
+    }
+
+    [Fact]
     public void Short_signing_key_stops_startup_without_printing_it()
     {
         const string shortKey = "too-short-key";

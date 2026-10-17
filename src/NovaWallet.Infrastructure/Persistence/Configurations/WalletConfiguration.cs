@@ -1,13 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NovaWallet.Domain;
 using NovaWallet.Domain.Wallets;
 
 namespace NovaWallet.Infrastructure.Persistence.Configurations;
 
 public sealed class WalletConfiguration : IEntityTypeConfiguration<Wallet>
 {
-    public const int CustomerIdMaxLength = 64;
-
     public void Configure(EntityTypeBuilder<Wallet> builder)
     {
         builder.ToTable("wallets", table =>
@@ -19,7 +18,7 @@ public sealed class WalletConfiguration : IEntityTypeConfiguration<Wallet>
         });
         builder.HasKey(w => w.Id);
         builder.Property(w => w.Id).ValueGeneratedNever();
-        builder.Property(w => w.CustomerId).HasMaxLength(CustomerIdMaxLength);
+        builder.Property(w => w.CustomerId).HasMaxLength(Identifiers.MaxLength);
         builder.HasIndex(w => w.CustomerId).IsUnique();
         builder.Property(w => w.Kind)
             .HasConversion(kind => kind == WalletKind.System ? "SYSTEM" : "CUSTOMER", value => value == "SYSTEM" ? WalletKind.System : WalletKind.Customer)

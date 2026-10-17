@@ -22,8 +22,9 @@ public class AuditTrailTests(NovaWalletApiFactory factory) : IClassFixture<NovaW
         await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand(statement, connection);
-        await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        var error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
 
+        Assert.Contains("audit_log is append-only", error.MessageText);
         Assert.Equal(before, await CountAsync(walletId));
     }
 
@@ -126,6 +127,18 @@ public class AuditTrailTests(NovaWalletApiFactory factory) : IClassFixture<NovaW
         var response = await Auditor().GetAsync($"/api/v1/audit?walletId={Guid.NewGuid()}");
 
         await response.AssertProblemAsync(HttpStatusCode.NotFound, "WALLET_NOT_FOUND");
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(100)]
+    public async Task Limit_boundaries_are_accepted(int limit)
+    {
+        var walletId = await SeedAsync(3);
+
+        var page = await Auditor().GetFromJsonAsync<JsonElement>($"/api/v1/audit?walletId={walletId}&limit={limit}");
+
+        Assert.Equal(Math.Min(limit, 3), page.GetProperty("items").GetArrayLength());
     }
 
     [Theory]

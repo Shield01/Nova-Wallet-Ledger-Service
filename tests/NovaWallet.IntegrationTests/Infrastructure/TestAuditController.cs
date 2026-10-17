@@ -39,7 +39,9 @@ public sealed class TestAuditController(
         await unitOfWork.InTransactionAsync<bool>(async ct =>
         {
             auditTrail.Append(Records(request).ToArray());
-            await Task.Yield();
+
+            // Flush first, so the rows really are in the database when the failure hits.
+            await db.SaveChangesAsync(ct);
             throw new InvalidOperationException(FailureMessage);
         }, cancellationToken);
         return NoContent();

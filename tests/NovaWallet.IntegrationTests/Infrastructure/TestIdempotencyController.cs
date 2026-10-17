@@ -34,15 +34,14 @@ public sealed class TestIdempotencyController(
     [RequiresIdempotencyKey]
     public async Task<IResult> Run(Body body, CancellationToken cancellationToken)
     {
-        var key = IdempotencyHttp.ReadKey(Request);
-        if (IdempotentRequest.Validate(key) is { } invalid)
+        if (!IdempotencyHttp.TryReadKey(Request, out var key, out var invalid))
         {
-            return invalid.ToProblem(HttpContext);
+            return invalid!.ToProblem(HttpContext);
         }
 
         var request = IdempotentRequest.For(
             caller.Subject,
-            key!,
+            key,
             "test-operation",
             ("walletId", body.WalletId.ToString()),
             ("amountKobo", body.AmountKobo.ToString(CultureInfo.InvariantCulture)));
@@ -55,14 +54,19 @@ public sealed class TestIdempotencyController(
                 await Task.Delay(body.DelayMs, inner);
             }
 
-            if (body.Refuse)
+            if (body.Refuse && !body.WriteBeforeRefusing)
             {
-                return new Error(ErrorCodes.InsufficientFunds, "Refused by the test operation.").With("remainingKobo", 5L);
+                return new Error(body.RefuseCode ?? ErrorCodes.InsufficientFunds, "Refused by the test operation.").With("remainingKobo", 5L);
             }
 
             var transactionId = TestLedger.AddTransaction(db, body.WalletId, body.AmountKobo, caller.Subject, correlation.CorrelationId, clock.GetUtcNow());
             audit.Append(AuditRecord.For(AuditAction.Credit, body.WalletId, transactionId, 0, body.AmountKobo, caller.Subject, correlation.CorrelationId, clock.GetUtcNow()));
             await db.SaveChangesAsync(inner);
+            if (body.Refuse)
+            {
+                return new Error(body.RefuseCode ?? ErrorCodes.InsufficientFunds, "Refused after writing.").With("remainingKobo", 5L);
+            }
+
             if (body.FailAfterWrite)
             {
                 throw new InvalidOperationException("Simulated failure after the operation wrote.");
@@ -74,7 +78,14 @@ public sealed class TestIdempotencyController(
         return IdempotencyHttp.Render(outcome, HttpContext, value => Results.Created($"/test/idempotency/{value.Id}", value));
     }
 
-    public sealed record Body(Guid WalletId, long AmountKobo, bool Refuse = false, bool FailAfterWrite = false, int DelayMs = 0);
+    public sealed record Body(
+        Guid WalletId,
+        long AmountKobo,
+        bool Refuse = false,
+        bool FailAfterWrite = false,
+        int DelayMs = 0,
+        bool WriteBeforeRefusing = false,
+        string? RefuseCode = null);
 
     public sealed record Outcome(Guid Id, long AmountKobo);
 }

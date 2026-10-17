@@ -15,14 +15,44 @@ public sealed class UnitOfWork(LedgerDbContext db, IOptions<DatabaseSettings> se
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        try
+        {
+            // Bounded lock waits: a stuck transaction turns into a fast 503 instead of a pile-up.
+            var lockTimeout = $"{settings.Value.LockTimeoutMilliseconds}ms";
+            await db.Database.ExecuteSqlAsync($"SELECT set_config('lock_timeout', {lockTimeout}, true)", cancellationToken);
 
-        // Bounded lock waits: a stuck transaction turns into a fast 503 instead of a pile-up.
-        var lockTimeout = $"{settings.Value.LockTimeoutMilliseconds}ms";
-        await db.Database.ExecuteSqlAsync($"SELECT set_config('lock_timeout', {lockTimeout}, true)", cancellationToken);
+            var result = await work(cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
 
-        var result = await work(cancellationToken);
+            // Once the writes are flushed, a client disconnect must not abort the commit and turn
+            // a completed money movement into a confusing 500.
+            await transaction.CommitAsync(CancellationToken.None);
+            return result;
+        }
+        catch
+        {
+            // Entities tracked during the failed work must not leak into anything else in this scope.
+            db.ChangeTracker.Clear();
+            throw;
+        }
+    }
+
+    public async Task<ISavepoint> SavepointAsync(CancellationToken cancellationToken)
+    {
+        var transaction = db.Database.CurrentTransaction
+            ?? throw new InvalidOperationException("Savepoints only exist inside a unit of work.");
+        var name = $"sp_{Guid.NewGuid():N}";
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return result;
+        await transaction.CreateSavepointAsync(name, cancellationToken);
+        return new Savepoint(db, transaction, name);
+    }
+
+    private sealed class Savepoint(LedgerDbContext db, Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction, string name) : ISavepoint
+    {
+        public async Task RollbackAsync(CancellationToken cancellationToken)
+        {
+            db.ChangeTracker.Clear();
+            await transaction.RollbackToSavepointAsync(name, cancellationToken);
+        }
     }
 }

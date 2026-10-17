@@ -17,6 +17,7 @@ public sealed record BalanceResponse(Guid WalletId, long BalanceKobo, string Cur
 
 public sealed record WalletResponse(Guid WalletId, string CustomerId, string Currency, long BalanceKobo, DateTimeOffset CreatedAt)
 {
+    // Only customer wallets are ever returned to clients, and those always have a customer id.
     public static WalletResponse From(Wallet wallet) =>
         new(wallet.Id, wallet.CustomerId!, Wallet.Currency, wallet.BalanceKobo, wallet.CreatedAt);
 }
