@@ -24,6 +24,16 @@ public static class LedgerApiMoney
         return client.SendAsync(request);
     }
 
+    public static Task<HttpResponseMessage> TransferAsync(this HttpClient client, Guid sourceWalletId, Guid destinationWalletId, long amountKobo, string? key = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/transfers")
+        {
+            Content = JsonContent.Create(new { sourceWalletId, destinationWalletId, amountKobo }),
+        };
+        request.Headers.TryAddWithoutValidation("Idempotency-Key", key ?? Guid.NewGuid().ToString());
+        return client.SendAsync(request);
+    }
+
     public static async Task<Guid> FundedWalletAsync(this NovaWalletApiFactory factory, string customerId, long amountKobo)
     {
         var walletId = await factory.CreateWalletAsync(customerId);
