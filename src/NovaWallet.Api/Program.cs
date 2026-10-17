@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using NovaWallet.Api.Auth;
 using NovaWallet.Api.Errors;
+using NovaWallet.Api.Observability;
 using NovaWallet.Infrastructure;
 using NovaWallet.Infrastructure.Persistence;
 
@@ -15,6 +16,7 @@ if (args.Contains(MigrateArgument))
     return;
 }
 
+builder.AddNovaWalletLogging();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddNovaWalletProblemDetails();
@@ -29,6 +31,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 
 var app = builder.Build();
 
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseAuthentication();
