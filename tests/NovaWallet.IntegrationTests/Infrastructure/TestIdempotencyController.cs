@@ -60,7 +60,8 @@ public sealed class TestIdempotencyController(
                 return new Error(ErrorCodes.InsufficientFunds, "Refused by the test operation.").With("remainingKobo", 5L);
             }
 
-            audit.Append(AuditRecord.For(AuditAction.Credit, body.WalletId, Guid.NewGuid(), 0, body.AmountKobo, caller.Subject, correlation.CorrelationId, clock.GetUtcNow()));
+            var transactionId = TestLedger.AddTransaction(db, body.WalletId, body.AmountKobo, caller.Subject, correlation.CorrelationId, clock.GetUtcNow());
+            audit.Append(AuditRecord.For(AuditAction.Credit, body.WalletId, transactionId, 0, body.AmountKobo, caller.Subject, correlation.CorrelationId, clock.GetUtcNow()));
             await db.SaveChangesAsync(inner);
             if (body.FailAfterWrite)
             {
