@@ -240,6 +240,7 @@ Tunables come from configuration with defaults in `appsettings.json`, overridden
 variables (`Section__Key`). Secrets (signing key, database passwords) come only from the
 environment. Keys: `ConnectionStrings:Ledger`, `ConnectionStrings:LedgerMigrations`, `Auth:*`,
 `Limits:DailyOutboundKobo`, `Database:LockTimeoutMilliseconds` (5000),
+`Health:ReadinessTimeoutMilliseconds` (3000), `Health:ReadinessCacheMilliseconds` (1000),
 `RateLimiting:Transfers:PermitLimit` (10), `RateLimiting:Transfers:WindowSeconds` (60),
 `Outbox:PollIntervalMilliseconds` (1000), `Outbox:MaxAttempts` (10), `OpenApi:Enabled` (true
 except in Production).
