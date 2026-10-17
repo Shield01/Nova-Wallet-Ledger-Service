@@ -76,6 +76,9 @@ namespace NovaWallet.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_audit_log");
 
+                    b.HasIndex("TransactionId")
+                        .HasDatabaseName("ix_audit_log_transaction_id");
+
                     b.HasIndex("OccurredAt", "Id")
                         .IsDescending()
                         .HasDatabaseName("ix_audit_log_occurred_at_id");
@@ -127,6 +130,116 @@ namespace NovaWallet.Infrastructure.Persistence.Migrations
                     b.ToTable("idempotency_records", (string)null);
                 });
 
+            modelBuilder.Entity("NovaWallet.Domain.Ledger.LedgerEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AmountKobo")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_kobo");
+
+                    b.Property<long>("BalanceAfterKobo")
+                        .HasColumnType("bigint")
+                        .HasColumnName("balance_after_kobo");
+
+                    b.Property<Guid?>("CounterpartyWalletId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("counterparty_wallet_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transaction_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("entry_type");
+
+                    b.Property<Guid>("WalletId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wallet_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ledger_entries");
+
+                    b.HasIndex("TransactionId")
+                        .HasDatabaseName("ix_ledger_entries_transaction_id");
+
+                    b.HasIndex("WalletId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_ledger_entries_wallet_id_created_at_id");
+
+                    b.ToTable("ledger_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_ledger_entries_amount_not_zero", "amount_kobo <> 0");
+                        });
+                });
+
+            modelBuilder.Entity("NovaWallet.Domain.Ledger.LedgerTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountKobo")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_kobo");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DestinationWalletId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("destination_wallet_id");
+
+                    b.Property<string>("InitiatedBy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("initiated_by");
+
+                    b.Property<Guid?>("SourceWalletId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_wallet_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ledger_transactions");
+
+                    b.HasIndex("DestinationWalletId")
+                        .HasDatabaseName("ix_ledger_transactions_destination_wallet_id");
+
+                    b.HasIndex("SourceWalletId")
+                        .HasDatabaseName("ix_ledger_transactions_source_wallet_id");
+
+                    b.ToTable("ledger_transactions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_ledger_transactions_amount_positive", "amount_kobo > 0");
+                        });
+                });
+
             modelBuilder.Entity("NovaWallet.Domain.Wallets.Wallet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -169,12 +282,52 @@ namespace NovaWallet.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("NovaWallet.Domain.Audit.AuditRecord", b =>
                 {
+                    b.HasOne("NovaWallet.Domain.Ledger.LedgerTransaction", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_audit_log_ledger_transaction_transaction_id");
+
                     b.HasOne("NovaWallet.Domain.Wallets.Wallet", null)
                         .WithMany()
                         .HasForeignKey("WalletId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_audit_log_wallet_wallet_id");
+                });
+
+            modelBuilder.Entity("NovaWallet.Domain.Ledger.LedgerEntry", b =>
+                {
+                    b.HasOne("NovaWallet.Domain.Ledger.LedgerTransaction", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ledger_entries_ledger_transaction_transaction_id");
+
+                    b.HasOne("NovaWallet.Domain.Wallets.Wallet", null)
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ledger_entries_wallet_wallet_id");
+                });
+
+            modelBuilder.Entity("NovaWallet.Domain.Ledger.LedgerTransaction", b =>
+                {
+                    b.HasOne("NovaWallet.Domain.Wallets.Wallet", null)
+                        .WithMany()
+                        .HasForeignKey("DestinationWalletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ledger_transactions_wallet_destination_wallet_id");
+
+                    b.HasOne("NovaWallet.Domain.Wallets.Wallet", null)
+                        .WithMany()
+                        .HasForeignKey("SourceWalletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ledger_transactions_wallet_source_wallet_id");
                 });
 #pragma warning restore 612, 618
         }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NovaWallet.Application.Abstractions;
 using NovaWallet.Application.Audit;
 using NovaWallet.Application.Idempotency;
+using NovaWallet.Application.Ledger;
 using NovaWallet.Application.Wallets;
 using NovaWallet.Infrastructure.Persistence;
 using NovaWallet.Infrastructure.Persistence.Stores;
@@ -26,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IWalletStore, WalletStore>();
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
+        services.AddScoped<ILedgerStore, LedgerStore>();
         return services;
     }
 }

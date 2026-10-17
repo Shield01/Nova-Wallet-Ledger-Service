@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using NovaWallet.Application.Abstractions;
 using NovaWallet.Application.Audit;
 using NovaWallet.Domain.Audit;
+using NovaWallet.Infrastructure.Persistence;
 
 namespace NovaWallet.IntegrationTests.Infrastructure;
 
@@ -14,6 +15,7 @@ namespace NovaWallet.IntegrationTests.Infrastructure;
 public sealed class TestAuditController(
     IUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
+    LedgerDbContext db,
     ICallerContext caller,
     ICorrelationContext correlation,
     TimeProvider clock) : ControllerBase
@@ -49,10 +51,11 @@ public sealed class TestAuditController(
         for (var i = 0; i < request.Count; i++)
         {
             var before = i * 100L;
+            var transactionId = TestLedger.AddTransaction(db, request.WalletId, 100, caller.Subject, correlation.CorrelationId, start);
             yield return AuditRecord.For(
                 AuditAction.Credit,
                 request.WalletId,
-                Guid.NewGuid(),
+                transactionId,
                 before,
                 before + 100,
                 caller.Subject,
