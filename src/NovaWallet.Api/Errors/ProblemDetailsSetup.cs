@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
+using NovaWallet.Api.Observability;
 using NovaWallet.Domain.Errors;
 
 namespace NovaWallet.Api.Errors;
@@ -9,6 +10,7 @@ public static class ProblemDetailsSetup
 {
     public const string CodeExtension = "code";
     public const string TraceIdExtension = "traceId";
+    public const string CorrelationIdExtension = "correlationId";
 
     public static IServiceCollection AddNovaWalletProblemDetails(this IServiceCollection services)
     {
@@ -39,6 +41,7 @@ public static class ProblemDetailsSetup
         problem.Detail ??= ErrorCatalogue.TitleFor(code);
         problem.Instance = httpContext.Request.Path;
         problem.Extensions[TraceIdExtension] = Activity.Current?.Id ?? httpContext.TraceIdentifier;
+        problem.Extensions[CorrelationIdExtension] = CorrelationIdMiddleware.Current(httpContext);
     }
 
     /// <summary>Converts a business refusal into a Problem Details result.</summary>
