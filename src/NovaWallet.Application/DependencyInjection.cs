@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<IdempotencyGuard>();
         services.AddScoped<CreditService>();
         services.AddScoped<TransferService>();
+        services.AddScoped<StatementService>();
         return services;
     }
 }
