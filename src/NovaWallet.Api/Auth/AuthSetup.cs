@@ -54,8 +54,11 @@ public static class AuthSetup
             options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
             foreach (var scope in Scopes.All)
             {
+                // Every scoped endpoint acts for a subject, so a token without `sub` is refused here
+                // (403) rather than failing later or slipping past the per-subject rate limit.
                 options.AddPolicy(scope, policy => policy
                     .RequireAuthenticatedUser()
+                    .RequireClaim(SubjectClaim)
                     .RequireAssertion(context => HasScope(context.User, scope)));
             }
         });

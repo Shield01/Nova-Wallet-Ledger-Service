@@ -8,8 +8,8 @@ code that needs it.
 
 A single ASP.NET Core 8 service over PostgreSQL 16. HTTP requests pass through middleware
 (correlation ID → exception handling → status-code problems → OpenAPI document and UI →
-authentication → authorisation → rate limiting) into controllers. Controllers validate input, then call one application service per
-use case. The service runs the whole use case inside **one database transaction**: lock the wallet
+authentication → authorisation → rate limiting) into controllers. Controllers validate input, then
+call one application service per use case. The service runs the whole use case inside **one database transaction**: lock the wallet
 rows, read the clock, check the rules, post ledger entries, write audit records, write the outbox
 message, store the idempotency record, commit. Nothing touching money happens outside that
 transaction.
