@@ -23,7 +23,8 @@ public static partial class DevTokenEndpoint
                     return Results.Problem(ValidationProblems.Build(httpContext, errors));
                 }
 
-                var (token, expiresAt) = issuer.Issue(request!.Subject!, request.Scopes!.Distinct(StringComparer.Ordinal));
+                // Validate guarantees a subject and a non-empty list of known scopes.
+                var (token, expiresAt) = issuer.Issue(request!.Subject!, request.Scopes!.Select(s => s!).Distinct(StringComparer.Ordinal));
                 return Results.Ok(new DevTokenResponse(token, "Bearer", expiresAt));
             })
             .AllowAnonymous()
@@ -45,9 +46,11 @@ public static partial class DevTokenEndpoint
         {
             errors["scopes"] = ["At least one scope is required."];
         }
-        else if (request.Scopes.FirstOrDefault(s => !Scopes.All.Contains(s)) is { } unknown)
+        else if (request.Scopes.Any(s => s is null || !Scopes.All.Contains(s)))
         {
-            errors["scopes"] = [$"Unknown scope '{unknown}'. Allowed: {string.Join(", ", Scopes.All)}."];
+            // Every element must be exactly one known scope: a null or a space-joined pair would
+            // otherwise slip past the checks and be split back into several scopes in the token.
+            errors["scopes"] = [$"Each scope must be one of: {string.Join(", ", Scopes.All)}."];
         }
         else if (request.Scopes.Contains(Scopes.Wallet) && request.Scopes.Contains(Scopes.LedgerCredit))
         {
@@ -58,10 +61,10 @@ public static partial class DevTokenEndpoint
         return errors;
     }
 
-    [GeneratedRegex("^[A-Za-z0-9_-]{1,64}$")]
+    [GeneratedRegex(@"^[A-Za-z0-9_-]{1,64}\z")]
     private static partial Regex SubjectPattern();
 
-    public sealed record DevTokenRequest(string? Subject, IReadOnlyList<string>? Scopes);
+    public sealed record DevTokenRequest(string? Subject, IReadOnlyList<string?>? Scopes);
 
     public sealed record DevTokenResponse(string AccessToken, string TokenType, DateTimeOffset ExpiresAt);
 }

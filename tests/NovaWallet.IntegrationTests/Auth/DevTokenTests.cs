@@ -35,6 +35,11 @@ public class DevTokenTests(NovaWalletApiFactory factory) : IClassFixture<NovaWal
     [InlineData("""{"subject":"has spaces","scopes":["wallet"]}""", "subject")]
     [InlineData("""{"subject":"","scopes":["wallet"]}""", "subject")]
     [InlineData("""{"subject":"cust-001","scopes":["wallet","ledger:credit"]}""", "scopes")]
+    [InlineData("""{"subject":"cust-001","scopes":[null,"wallet ledger:credit"]}""", "scopes")]
+    [InlineData("""{"subject":"cust-001","scopes":["wallet ledger:credit"]}""", "scopes")]
+    [InlineData("""{"subject":"cust-001","scopes":[null,"admin"]}""", "scopes")]
+    [InlineData("""{"subject":"cust-001\n","scopes":["wallet"]}""", "subject")]
+    [InlineData("""{"subject":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","scopes":["wallet"]}""", "subject")]
     public async Task Invalid_requests_get_no_token(string json, string field)
     {
         var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
@@ -43,6 +48,14 @@ public class DevTokenTests(NovaWalletApiFactory factory) : IClassFixture<NovaWal
 
         var problem = await response.AssertProblemAsync(HttpStatusCode.BadRequest, "VALIDATION_FAILED");
         Assert.True(problem.GetProperty("errors").TryGetProperty(field, out _), problem.GetRawText());
+    }
+
+    [Fact]
+    public async Task Sixty_four_character_subject_is_accepted()
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync("/dev/token", new { subject = new string('s', 64), scopes = new[] { "audit:read" } });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

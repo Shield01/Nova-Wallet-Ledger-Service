@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NovaWallet.Application.Abstractions;
 using NovaWallet.Domain.Errors;
 using NovaWallet.Domain.Idempotency;
 
@@ -8,7 +9,7 @@ namespace NovaWallet.Application.Idempotency;
 /// Runs an operation at most once per caller and key. Must be called inside a unit of work: the
 /// lock, the operation's writes and the stored outcome all share its transaction.
 /// </summary>
-public sealed class IdempotencyGuard(IIdempotencyStore store, TimeProvider clock)
+public sealed class IdempotencyGuard(IIdempotencyStore store, IUnitOfWork unitOfWork, TimeProvider clock)
 {
     /// <summary>Refusals that are final for the request, so a retry with the same key gets them again.</summary>
     public static readonly IReadOnlySet<string> StoredRefusals = new HashSet<string>(StringComparer.Ordinal)
@@ -43,12 +44,17 @@ public sealed class IdempotencyGuard(IIdempotencyStore store, TimeProvider clock
                     "This Idempotency-Key was already used for a different request. Use a new key for a new payment."));
         }
 
+        // A refusal must leave no trace of anything the operation wrote before refusing.
+        var beforeOperation = await unitOfWork.SavepointAsync(cancellationToken);
         var result = await operation(cancellationToken);
         if (result.IsSuccess)
         {
             store.Add(Record(request, IdempotencyRecord.SuccessOutcome, JsonSerializer.Serialize(result.Value, Json)));
+            return IdempotentOutcome<T>.Fresh(result);
         }
-        else if (StoredRefusals.Contains(result.Error.Code))
+
+        await beforeOperation.RollbackAsync(cancellationToken);
+        if (StoredRefusals.Contains(result.Error.Code))
         {
             var refusal = new StoredRefusal(result.Error.Detail, result.Error.Extensions);
             store.Add(Record(request, result.Error.Code, JsonSerializer.Serialize(refusal, Json)));
@@ -58,16 +64,18 @@ public sealed class IdempotencyGuard(IIdempotencyStore store, TimeProvider clock
     }
 
     private IdempotencyRecord Record(IdempotentRequest request, string outcome, string body) =>
-        IdempotencyRecord.Create(request.CallerId, request.Key, request.RequestHash, outcome, body, clock.GetUtcNow());
+        IdempotencyRecord.Create(request.CallerId, request.Key, request.RequestHash, outcome, body, clock.GetStoredUtcNow());
 
     private static Result<T> Restore<T>(IdempotencyRecord stored)
     {
         if (stored.Outcome == IdempotencyRecord.SuccessOutcome)
         {
-            return JsonSerializer.Deserialize<T>(stored.ResponseBody, Json)!;
+            return JsonSerializer.Deserialize<T>(stored.ResponseBody, Json)
+                ?? throw new InvalidOperationException("A stored idempotent outcome could not be read back.");
         }
 
-        var refusal = JsonSerializer.Deserialize<StoredRefusal>(stored.ResponseBody, Json)!;
+        var refusal = JsonSerializer.Deserialize<StoredRefusal>(stored.ResponseBody, Json)
+            ?? throw new InvalidOperationException("A stored idempotent refusal could not be read back.");
         return new Error(stored.Outcome, refusal.Detail) { Extensions = refusal.Extensions ?? new Dictionary<string, object?>() };
     }
 

@@ -95,7 +95,7 @@ public class CreateWalletTests(NovaWalletApiFactory factory) : IClassFixture<Nov
     }
 
     [Fact]
-    public async Task System_account_is_seeded_and_runtime_role_can_only_select_insert_update_wallets()
+    public async Task System_account_is_seeded_and_runtime_role_can_only_open_wallets_and_change_balances()
     {
         await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
         await connection.OpenAsync();
@@ -111,7 +111,35 @@ public class CreateWalletTests(NovaWalletApiFactory factory) : IClassFixture<Nov
         await using var grants = new NpgsqlCommand(
             "SELECT string_agg(privilege_type, ',' ORDER BY privilege_type) FROM information_schema.role_table_grants WHERE grantee = 'novawallet_app' AND table_name = 'wallets'",
             connection);
-        Assert.Equal("INSERT,SELECT,UPDATE", (string?)await grants.ExecuteScalarAsync());
+        Assert.Equal("INSERT,SELECT", (string?)await grants.ExecuteScalarAsync());
+
+        await using var columns = new NpgsqlCommand(
+            "SELECT string_agg(column_name, ',' ORDER BY column_name) FROM information_schema.column_privileges WHERE grantee = 'novawallet_app' AND table_name = 'wallets' AND privilege_type = 'UPDATE'",
+            connection);
+        Assert.Equal("balance_kobo", (string?)await columns.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task Only_one_system_account_can_exist()
+    {
+        await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
+        await connection.OpenAsync();
+        await using var insert = new NpgsqlCommand(
+            $"INSERT INTO wallets (id, customer_id, kind, balance_kobo, created_at) VALUES ('{Guid.NewGuid()}', NULL, 'SYSTEM', 0, now())",
+            connection);
+
+        var violation = await Assert.ThrowsAsync<PostgresException>(() => insert.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.CheckViolation, violation.SqlState);
+    }
+
+    [Fact]
+    public async Task Sixty_four_character_customer_id_is_accepted()
+    {
+        var customerId = new string('c', 64);
+
+        var response = await factory.CustomerClient(customerId).PostAsJsonAsync(Path, new { customerId });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     [Fact]

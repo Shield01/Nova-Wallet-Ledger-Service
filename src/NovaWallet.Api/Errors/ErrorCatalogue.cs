@@ -2,7 +2,7 @@ using NovaWallet.Domain.Errors;
 
 namespace NovaWallet.Api.Errors;
 
-/// <summary>The single mapping from error code to HTTP status and title (architecture.md "Errors").</summary>
+/// <summary>The single mapping from error code to HTTP status and title (docs/ARCHITECTURE.md "Errors").</summary>
 public static class ErrorCatalogue
 {
     public const string TypeBaseUri = "https://novawallet.example/errors/";

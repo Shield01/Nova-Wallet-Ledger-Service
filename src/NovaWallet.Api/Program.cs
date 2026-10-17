@@ -28,7 +28,6 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 {
     // The web defaults accept numbers written as strings; amounts must be real JSON integers.
     options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.Strict;
-    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
 var app = builder.Build();

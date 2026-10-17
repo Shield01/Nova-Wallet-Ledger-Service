@@ -1,6 +1,5 @@
 using NovaWallet.Application;
 using NovaWallet.Domain.Audit;
-using NovaWallet.Infrastructure.Persistence.Configurations;
 
 namespace NovaWallet.Api.Contracts;
 
@@ -22,7 +21,7 @@ public sealed record AuditPageResponse(IReadOnlyList<AuditEntryResponse> Items, 
         page.Items.Select(a => new AuditEntryResponse(
             a.Id,
             a.OccurredAt,
-            AuditRecordConfiguration.ToCode(a.Action),
+            AuditActionCodes.ToCode(a.Action),
             a.WalletId,
             a.TransactionId,
             a.AmountKobo,

@@ -43,7 +43,7 @@ public sealed partial class CorrelationIdMiddleware(RequestDelegate next, ILogge
     private static string Accept(string? inbound) =>
         inbound is not null && AllowedFormat().IsMatch(inbound) ? inbound : Guid.NewGuid().ToString("N");
 
-    [GeneratedRegex("^[A-Za-z0-9-]{1,64}$")]
+    [GeneratedRegex(@"^[A-Za-z0-9-]{1,64}\z")]
     private static partial Regex AllowedFormat();
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Method} {Route} responded {StatusCode} in {ElapsedMilliseconds:0.0} ms")]

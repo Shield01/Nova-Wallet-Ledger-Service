@@ -46,6 +46,17 @@ public class CorrelationIdTests(NovaWalletApiFactory factory) : IClassFixture<No
     }
 
     [Fact]
+    public async Task Sixty_four_character_inbound_id_is_kept()
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(Header, new string('a', 64));
+
+        var response = await client.GetAsync("/health/live");
+
+        Assert.Equal(new string('a', 64), Single(response, Header));
+    }
+
+    [Fact]
     public async Task Over_long_inbound_id_is_replaced()
     {
         var client = factory.CreateClient();

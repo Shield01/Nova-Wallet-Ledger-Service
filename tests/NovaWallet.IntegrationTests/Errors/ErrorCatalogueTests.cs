@@ -5,7 +5,7 @@ namespace NovaWallet.IntegrationTests.Errors;
 
 public class ErrorCatalogueTests
 {
-    // The catalogue in architecture.md "Errors"; a change there must be made here deliberately.
+    // The catalogue in docs/ARCHITECTURE.md "Errors"; a change there must be made here deliberately.
     public static readonly TheoryData<string, int> Expected = new()
     {
         { "VALIDATION_FAILED", 400 },

@@ -4,7 +4,6 @@ using NovaWallet.Api.Auth;
 using NovaWallet.Api.Contracts;
 using NovaWallet.Api.Errors;
 using NovaWallet.Api.Idempotency;
-using NovaWallet.Application.Idempotency;
 using NovaWallet.Application.Ledger;
 
 namespace NovaWallet.Api.Controllers;
@@ -30,13 +29,13 @@ public sealed class TransfersController(TransferService transfers) : ControllerB
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
     public async Task<IResult> Transfer(TransferRequest request, CancellationToken cancellationToken)
     {
-        var key = IdempotencyHttp.ReadKey(Request);
-        if (IdempotentRequest.Validate(key) is { } invalidKey)
+        if (!IdempotencyHttp.TryReadKey(Request, out var key, out var invalidKey))
         {
-            return invalidKey.ToProblem(HttpContext);
+            return invalidKey!.ToProblem(HttpContext);
         }
 
-        var outcome = await transfers.TransferAsync(request.SourceWalletId!.Value, request.DestinationWalletId!.Value, request.AmountKobo, key!, cancellationToken);
+        // [Required] guarantees both ids once model validation has passed.
+        var outcome = await transfers.TransferAsync(request.SourceWalletId!.Value, request.DestinationWalletId!.Value, request.AmountKobo, key, cancellationToken);
         return IdempotencyHttp.Render(outcome, HttpContext, result =>
             Results.Json(TransferResponse.From(result), statusCode: StatusCodes.Status201Created));
     }

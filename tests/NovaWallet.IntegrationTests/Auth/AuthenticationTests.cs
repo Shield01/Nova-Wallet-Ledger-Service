@@ -42,6 +42,18 @@ public class AuthenticationTests(NovaWalletApiFactory factory) : IClassFixture<N
     }
 
     [Fact]
+    public async Task Rejected_tokens_get_a_bare_challenge_without_the_reason()
+    {
+        var token = factory.Tokens.Create(Subject, [TestTokens.WalletScope], overrideSigningKey: new string('k', 64));
+
+        var response = await Client(token).GetAsync("/test/auth/wallet");
+
+        var challenge = Assert.Single(response.Headers.WwwAuthenticate);
+        Assert.Equal("Bearer", challenge.Scheme);
+        Assert.True(string.IsNullOrEmpty(challenge.Parameter), challenge.Parameter);
+    }
+
+    [Fact]
     public async Task Token_from_another_issuer_is_unauthenticated()
     {
         await AssertUnauthenticated(factory.Tokens.Create(Subject, [TestTokens.WalletScope], overrideIssuer: "someone-else"));

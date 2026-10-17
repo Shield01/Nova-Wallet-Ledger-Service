@@ -3,6 +3,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using NovaWallet.IntegrationTests.Infrastructure;
 using Npgsql;
 
@@ -58,7 +61,7 @@ public class IdempotencyGuardTests(NovaWalletApiFactory factory) : IClassFixture
     {
         var (client, key, walletId) = await ArrangeAsync();
         var slow = Send(client, key, new { walletId, amountKobo = 700, delayMs = 2000 });
-        await Task.Delay(400);
+        await WaitForAdvisoryLockAsync();
 
         var timer = Stopwatch.StartNew();
         var concurrent = await Send(client, key, new { walletId, amountKobo = 700 });
@@ -86,6 +89,55 @@ public class IdempotencyGuardTests(NovaWalletApiFactory factory) : IClassFixture
         Assert.Equal(HttpStatusCode.Created, retry.StatusCode);
         Assert.Equal(2, Invocations(key));
         Assert.Equal(1, await AuditRowsAsync(walletId));
+    }
+
+    [Theory]
+    [InlineData("INSUFFICIENT_FUNDS", true)]
+    [InlineData("FORBIDDEN", false)]
+    public async Task Refusal_after_writing_discards_the_writes(string code, bool stored)
+    {
+        var (client, key, walletId) = await ArrangeAsync();
+
+        var refused = await Send(client, key, new { walletId, amountKobo = 700, refuse = true, writeBeforeRefusing = true, refuseCode = code });
+
+        Assert.Equal(code, (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+        Assert.Equal(0, await AuditRowsAsync(walletId));
+        Assert.Equal(stored, await StoredOrNullAsync(key) is not null);
+    }
+
+    [Fact]
+    public async Task Outcome_is_stored_in_the_same_transaction_as_the_operations_writes()
+    {
+        var (_, key, walletId) = await ArrangeAsync();
+        using var failing = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.AddSingleton<ISaveChangesInterceptor, FailOnIdempotencyRecordInterceptor>()));
+        var failingClient = failing.CreateClient().WithBearer(factory.Tokens.For("idem-caller", TestTokens.WalletScope));
+
+        var failed = await Send(failingClient, key, new { walletId, amountKobo = 700 });
+
+        await failed.AssertProblemAsync(HttpStatusCode.InternalServerError, "INTERNAL_ERROR");
+        Assert.Equal(0, await AuditRowsAsync(walletId));
+        Assert.Null(await StoredOrNullAsync(key));
+
+        var retry = await Send(Client("idem-caller"), key, new { walletId, amountKobo = 700 });
+
+        Assert.Equal(HttpStatusCode.Created, retry.StatusCode);
+        Assert.Equal(2, Invocations(key));
+        Assert.Equal(1, await AuditRowsAsync(walletId));
+    }
+
+    [Fact]
+    public async Task Repeated_idempotency_key_headers_are_rejected()
+    {
+        var (client, _, walletId) = await ArrangeAsync();
+        var request = new HttpRequestMessage(HttpMethod.Post, Path) { Content = JsonContent.Create(new { walletId, amountKobo = 1 }) };
+        request.Headers.TryAddWithoutValidation("Idempotency-Key", "key-a");
+        request.Headers.TryAddWithoutValidation("Idempotency-Key", "key-b");
+
+        var response = await client.SendAsync(request);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, "IDEMPOTENCY_KEY_INVALID");
+        Assert.Equal(0, await AuditRowsAsync(walletId));
     }
 
     [Fact]
@@ -129,6 +181,8 @@ public class IdempotencyGuardTests(NovaWalletApiFactory factory) : IClassFixture
         Assert.Equal(5, replayProblem.GetProperty("remainingKobo").GetInt64());
         Assert.Equal(firstProblem.GetProperty("detail").GetString(), replayProblem.GetProperty("detail").GetString());
         Assert.Equal("corr-replay", replayProblem.GetProperty("correlationId").GetString());
+        Assert.NotEqual(firstProblem.GetProperty("traceId").GetString(), replayProblem.GetProperty("traceId").GetString());
+        Assert.Equal(Path, replayProblem.GetProperty("instance").GetString());
         Assert.Equal(1, Invocations(key));
         Assert.Equal(("INSUFFICIENT_FUNDS", 64), await StoredAsync(key));
     }
@@ -175,6 +229,27 @@ public class IdempotencyGuardTests(NovaWalletApiFactory factory) : IClassFixture
             connection);
 
         Assert.Equal("INSERT,SELECT", (string?)await grants.ExecuteScalarAsync());
+    }
+
+    // Waits for a real signal (the advisory lock is held) rather than guessing with a delay.
+    private async Task WaitForAdvisoryLockAsync()
+    {
+        await using var connection = new NpgsqlConnection(factory.OwnerConnectionString);
+        await connection.OpenAsync();
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            await using var command = new NpgsqlCommand(
+                "SELECT count(*) FROM pg_locks l JOIN pg_database d ON d.oid = l.database WHERE l.locktype = 'advisory' AND l.granted AND d.datname = current_database()",
+                connection);
+            if ((long)(await command.ExecuteScalarAsync())! > 0)
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new Xunit.Sdk.XunitException("The slow request never took its advisory lock.");
     }
 
     private async Task<(HttpClient Client, string Key, Guid WalletId)> ArrangeAsync()

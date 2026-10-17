@@ -21,6 +21,7 @@ public sealed class WalletsController(WalletService wallets) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
     public async Task<IResult> Create(CreateWalletRequest request, CancellationToken cancellationToken)
     {
+        // [Required] on the request guarantees a value once model validation has passed.
         var result = await wallets.CreateAsync(request.CustomerId!, cancellationToken);
         if (!result.IsSuccess)
         {

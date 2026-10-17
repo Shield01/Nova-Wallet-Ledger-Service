@@ -7,7 +7,7 @@ code that needs it.
 ## System shape
 
 A single ASP.NET Core 8 service over PostgreSQL 16. HTTP requests pass through middleware
-(exception handling → status-code problems → correlation ID → authentication → authorisation →
+(correlation ID → exception handling → status-code problems → authentication → authorisation →
 rate limiting) into controllers. Controllers validate input, then call one application service per
 use case. The service runs the whole use case inside **one database transaction**: lock the wallet
 rows, read the clock, check the rules, post ledger entries, write audit records, write the outbox
@@ -224,8 +224,9 @@ logs), `correlationId`. Validation errors add `errors`
   environment is `Development`. It refuses to put `wallet` and `ledger:credit` in the same token, so
   a customer token can never credit. Startup fails if the dev issuer is enabled outside
   Development, if the signing key is missing or shorter than 32 bytes, or if the environment is
-  Production and the key's SHA-256 fingerprint matches the committed development default (the code
-  holds only the fingerprint, never a second copy of the key). The `--migrate` mode configures no
+  outside Development and the key's SHA-256 fingerprint matches the committed development default
+  (the code holds only the fingerprint, never a second copy of the key). Token validation failures
+  return a bare `WWW-Authenticate: Bearer` challenge, never the reason. The `--migrate` mode configures no
   authentication and runs none of these guards.
 - Clocks: token minting and lifetime validation both use the wall clock, because the JWT library
   validates against it. Business time (ledger timestamps, the daily window) uses the injected
@@ -253,7 +254,7 @@ except in Production).
 
   | Table | `novawallet_app` privileges |
   |---|---|
-  | `wallets` | SELECT, INSERT, UPDATE |
+  | `wallets` | SELECT, INSERT, UPDATE of `balance_kobo` only |
   | `ledger_transactions`, `ledger_entries` | SELECT, INSERT (the ledger is append-only) |
   | `audit_log` | SELECT, INSERT |
   | `idempotency_records` | SELECT, INSERT |

@@ -21,9 +21,9 @@ public sealed class AuthSettingsValidator(IHostEnvironment environment) : IValid
             failures.Add("Auth:DevIssuer:Enabled may only be true in the Development environment; the development token issuer mints tokens for anyone.");
         }
 
-        if (environment.IsProduction() && settings.SigningKey is not null && IsDevelopmentDefault(settings.SigningKey))
+        if (!environment.IsDevelopment() && settings.SigningKey is not null && IsDevelopmentDefault(settings.SigningKey))
         {
-            failures.Add("Auth:SigningKey is the committed development default; set a real key through Auth__SigningKey in Production.");
+            failures.Add("Auth:SigningKey is the committed development default, which anyone can read; set a real key through Auth__SigningKey outside Development.");
         }
 
         if (settings.TokenLifetimeMinutes <= 0)

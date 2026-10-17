@@ -52,6 +52,21 @@ public class CreditTests(NovaWalletApiFactory factory) : IClassFixture<NovaWalle
     }
 
     [Fact]
+    public async Task Returned_timestamp_equals_the_stored_one_even_with_a_sub_microsecond_clock()
+    {
+        var walletId = await factory.CreateWalletAsync(LedgerApi.NewCustomerId());
+        factory.Clock.Advance(TimeSpan.FromTicks(1_234_567));
+
+        var response = await factory.InboundSystemClient().CreditAsync(walletId, 100);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var transactionId = body.GetProperty("transactionId").GetGuid();
+        var returned = body.GetProperty("createdAt").GetDateTimeOffset();
+        var stored = await QueryAsync($"SELECT created_at FROM ledger_entries WHERE transaction_id = '{transactionId}'");
+        Assert.All(stored, row => Assert.Equal(returned, new DateTimeOffset((DateTime)row[0])));
+    }
+
+    [Fact]
     public async Task Replay_with_the_same_key_returns_the_original_and_moves_money_once()
     {
         var walletId = await factory.CreateWalletAsync(LedgerApi.NewCustomerId());

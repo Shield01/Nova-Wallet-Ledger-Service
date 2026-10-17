@@ -20,7 +20,7 @@ public sealed class WalletService(IWalletStore wallets, ICallerContext caller, T
             return AlreadyExists(existing);
         }
 
-        var wallet = Wallet.OpenFor(customerId, clock.GetUtcNow());
+        var wallet = Wallet.OpenFor(customerId, clock.GetStoredUtcNow());
         if (await wallets.TryAddAsync(wallet, cancellationToken))
         {
             return wallet;
@@ -43,7 +43,7 @@ public sealed class WalletService(IWalletStore wallets, ICallerContext caller, T
     {
         var owned = await GetOwnedAsync(walletId, cancellationToken);
         return owned.IsSuccess
-            ? new WalletBalance(owned.Value.Id, owned.Value.BalanceKobo, Wallet.Currency, clock.GetUtcNow())
+            ? new WalletBalance(owned.Value.Id, owned.Value.BalanceKobo, Wallet.Currency, clock.GetStoredUtcNow())
             : owned.Error;
     }
 
