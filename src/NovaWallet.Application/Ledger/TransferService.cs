@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Extensions.Options;
 using NovaWallet.Application.Abstractions;
 using NovaWallet.Application.Audit;
 using NovaWallet.Application.Idempotency;
@@ -17,9 +18,12 @@ public sealed class TransferService(
     IAuditTrail audit,
     ICallerContext caller,
     ICorrelationContext correlation,
-    TimeProvider clock)
+    TimeProvider clock,
+    IOptions<LimitSettings> limits)
 {
     public const string Operation = "transfer";
+    public const string DailyLimitExtension = "dailyLimitKobo";
+    public const string RemainingExtension = "remainingKobo";
 
     public Task<IdempotentOutcome<TransferResult>> TransferAsync(
         Guid sourceWalletId,
@@ -68,6 +72,17 @@ public sealed class TransferService(
         if (source.BalanceKobo < amountKobo)
         {
             return new Error(ErrorCodes.InsufficientFunds, "The source wallet's balance is lower than the amount.");
+        }
+
+        // Checked while the source row is locked, so concurrent transfers can't jointly exceed it.
+        var dailyLimit = limits.Value.DailyOutboundKobo;
+        var day = WatDay.Containing(now);
+        var sentToday = await ledger.OutboundTotalAsync(source.Id, day.Start, day.End, cancellationToken);
+        if (checked(sentToday + amountKobo) > dailyLimit)
+        {
+            return new Error(ErrorCodes.DailyLimitExceeded, "This transfer would exceed the wallet's daily outbound limit (resets at midnight WAT).")
+                .With(DailyLimitExtension, dailyLimit)
+                .With(RemainingExtension, Math.Max(0, dailyLimit - sentToday));
         }
 
         var posting = LedgerPosting.Move(LedgerTransactionType.Transfer, source, destination, amountKobo, caller.Subject, correlation.CorrelationId, now);
