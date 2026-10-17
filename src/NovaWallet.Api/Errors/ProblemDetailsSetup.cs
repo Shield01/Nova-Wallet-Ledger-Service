@@ -40,7 +40,7 @@ public static class ProblemDetailsSetup
         problem.Title = ErrorCatalogue.TitleFor(code);
         problem.Detail ??= ErrorCatalogue.TitleFor(code);
         problem.Instance = httpContext.Request.Path;
-        problem.Extensions[TraceIdExtension] = Activity.Current?.Id ?? httpContext.TraceIdentifier;
+        problem.Extensions[TraceIdExtension] = Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier;
         problem.Extensions[CorrelationIdExtension] = CorrelationIdMiddleware.Current(httpContext);
     }
 

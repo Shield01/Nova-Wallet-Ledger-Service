@@ -42,7 +42,9 @@ warnings as errors). Package versions pinned centrally in `Directory.Packages.pr
 2. Money arithmetic is `checked`, so an overflow throws instead of wrapping silently.
 3. Every movement is double-entry: a ledger transaction has two entries whose signed amounts sum to
    zero. Entry types: `CREDIT` (customer side of a credit), `CREDIT_SETTLEMENT` (system side of a
-   credit), `TRANSFER_OUT`, `TRANSFER_IN`.
+   credit), `TRANSFER_OUT`, `TRANSFER_IN`. `ledger_transactions.id` is a UUID and is the
+   `transactionId` / `transferId` everywhere (responses, statement, audit, outbox).
+   `ledger_entries.id` is a `bigserial`, so ids grow with insertion order and break timestamp ties.
 4. The system account `NIP_INBOUND_SETTLEMENT` has the fixed id
    `00000000-0000-0000-0000-000000000001`, no customer, and is seeded by migration. Credits debit
    it, so its balance is negative. Customers can never read it or transfer from or to it: it
@@ -76,8 +78,8 @@ Applies to `POST /api/v1/transfers` and `POST /api/v1/wallets/{id}/credits`.
   `IDEMPOTENCY_KEY_INVALID`.
 - Scope: the caller (`sub`) plus the key. Table `idempotency_records`, primary key
   `(caller_id, idempotency_key)`, columns `request_hash`, `outcome` (`SUCCESS` or an error code),
-  `response_body` (text: the success DTO as JSON, or the refusal's detail and extensions as JSON),
-  `created_at`.
+  `response_body` (text: the use-case result as JSON, or the refusal's detail and extensions as
+  JSON; the Api maps either to the HTTP response), `created_at`.
 - `request_hash` is SHA-256 over the operation name and the parsed request values in a fixed order,
   so JSON property order doesn't matter. The same key reused on another operation or payload is a
   mismatch.
@@ -100,7 +102,8 @@ Applies to `POST /api/v1/transfers` and `POST /api/v1/wallets/{id}/credits`.
 ### Transfer refusal precedence
 
 When several refusals apply, the first in this order wins (and is what gets stored):
-400 validation and key → idempotency (replay / 409 / 422 reuse) → 404 `WALLET_NOT_FOUND` (source
+400 `VALIDATION_FAILED` → 400 `IDEMPOTENCY_KEY_REQUIRED` / `IDEMPOTENCY_KEY_INVALID` → idempotency
+(replay / 409 / 422 reuse) → 404 `WALLET_NOT_FOUND` (source
 unknown or not owned) → 422 `SAME_WALLET_TRANSFER` → 422 `DESTINATION_WALLET_NOT_FOUND` → 422
 `INSUFFICIENT_FUNDS` → 422 `DAILY_LIMIT_EXCEEDED`.
 
@@ -127,7 +130,8 @@ unknown or not owned) → 422 `SAME_WALLET_TRANSFER` → 422 `DESTINATION_WALLET
 - Immutable at the database level: triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on
   `audit_log`. The runtime role has only `SELECT` and `INSERT` on it, and the schema owner is not a
   superuser, so it can't switch triggers off with `session_replication_role`. The owner could still
-  drop a trigger in a migration; tamper evidence (a hash chain) is a production follow-up.
+  `DROP TRIGGER` or `ALTER TABLE … DISABLE TRIGGER` in a migration; separating the migration role
+  from the table owner and adding tamper evidence (a hash chain) are production follow-ups.
 - Read through `GET /api/v1/audit` (scope `audit:read`) and directly with SQL (README).
 
 ## Outbox
@@ -181,12 +185,13 @@ Numbers written as strings are rejected.
 
 Every non-2xx response is `application/problem+json` with `type`
 (`https://novawallet.example/errors/{kebab-code}`), `title` (fixed per code), `status`, `detail`,
-`instance`, and extensions `code`, `traceId`, `correlationId`. Validation errors add `errors`
+`instance`, and extensions `code`, `traceId` (the W3C trace id, the same value as `TraceId` in the
+logs), `correlationId`. Validation errors add `errors`
 (camelCase field → messages). No stack traces or internal messages leave the service.
 
 | Status | `code` | When |
 |---|---|---|
-| 400 | `VALIDATION_FAILED` | Body, route or query fails validation |
+| 400 | `VALIDATION_FAILED` | Body or query fails validation |
 | 400 | `IDEMPOTENCY_KEY_REQUIRED` / `IDEMPOTENCY_KEY_INVALID` | See Idempotency |
 | 401 | `UNAUTHENTICATED` | Missing, malformed, expired or wrongly signed token |
 | 403 | `FORBIDDEN` | Token lacks the required scope, or `customerId` ≠ `sub` on wallet creation |
@@ -219,7 +224,12 @@ Every non-2xx response is `application/problem+json` with `type`
   environment is `Development`. It refuses to put `wallet` and `ledger:credit` in the same token, so
   a customer token can never credit. Startup fails if the dev issuer is enabled outside
   Development, if the signing key is missing or shorter than 32 bytes, or if the environment is
-  Production and the key equals the committed development default.
+  Production and the key's SHA-256 fingerprint matches the committed development default (the code
+  holds only the fingerprint, never a second copy of the key). The `--migrate` mode configures no
+  authentication and runs none of these guards.
+- Clocks: token minting and lifetime validation both use the wall clock, because the JWT library
+  validates against it. Business time (ledger timestamps, the daily window) uses the injected
+  `TimeProvider`.
 - With HS256, whoever can verify tokens can mint them; production would use an asymmetric key from
   a real issuer (README).
 
