@@ -1,13 +1,14 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using NovaWallet.Api.Auth;
 using NovaWallet.IntegrationTests.Infrastructure;
 
 namespace NovaWallet.IntegrationTests.Auth;
 
 public class StartupGuardTests(NovaWalletApiFactory factory) : IClassFixture<NovaWalletApiFactory>
 {
+    private static readonly string ComposeDevelopmentKey = ReadComposeDevelopmentKey();
+
     [Fact]
     public void Dev_issuer_outside_development_stops_startup()
     {
@@ -33,11 +34,11 @@ public class StartupGuardTests(NovaWalletApiFactory factory) : IClassFixture<Nov
         var error = StartupFailure("Production", new()
         {
             ["Auth:DevIssuer:Enabled"] = "false",
-            ["Auth:SigningKey"] = AuthSettings.ComposeDevelopmentSigningKey,
+            ["Auth:SigningKey"] = ComposeDevelopmentKey,
         });
 
         Assert.Contains("development default", error);
-        Assert.DoesNotContain(AuthSettings.ComposeDevelopmentSigningKey, error);
+        Assert.DoesNotContain(ComposeDevelopmentKey, error);
     }
 
     private string StartupFailure(string environment, Dictionary<string, string?> settings)
@@ -50,6 +51,21 @@ public class StartupGuardTests(NovaWalletApiFactory factory) : IClassFixture<Nov
 
         var exception = Assert.ThrowsAny<Exception>(() => configured.CreateClient());
         return Flatten(exception);
+    }
+
+    // Read from docker-compose.yml so the test proves the real committed default is refused.
+    private static string ReadComposeDevelopmentKey()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "docker-compose.yml")))
+        {
+            directory = directory.Parent;
+        }
+
+        var compose = File.ReadAllText(Path.Combine(directory!.FullName, "docker-compose.yml"));
+        var match = System.Text.RegularExpressions.Regex.Match(compose, @"Auth__SigningKey: \$\{NOVAWALLET_SIGNING_KEY:-(?<key>[^}]+)\}");
+        Assert.True(match.Success, "docker-compose.yml no longer has the expected Auth__SigningKey default.");
+        return match.Groups["key"].Value;
     }
 
     private static string Flatten(Exception exception)

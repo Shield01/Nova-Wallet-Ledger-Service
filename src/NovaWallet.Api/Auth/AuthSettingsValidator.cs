@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 
@@ -20,7 +21,7 @@ public sealed class AuthSettingsValidator(IHostEnvironment environment) : IValid
             failures.Add("Auth:DevIssuer:Enabled may only be true in the Development environment; the development token issuer mints tokens for anyone.");
         }
 
-        if (environment.IsProduction() && string.Equals(settings.SigningKey, AuthSettings.ComposeDevelopmentSigningKey, StringComparison.Ordinal))
+        if (environment.IsProduction() && settings.SigningKey is not null && IsDevelopmentDefault(settings.SigningKey))
         {
             failures.Add("Auth:SigningKey is the committed development default; set a real key through Auth__SigningKey in Production.");
         }
@@ -32,4 +33,10 @@ public sealed class AuthSettingsValidator(IHostEnvironment environment) : IValid
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
+
+    private static bool IsDevelopmentDefault(string key) =>
+        string.Equals(
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key))),
+            AuthSettings.ComposeDevelopmentSigningKeySha256,
+            StringComparison.OrdinalIgnoreCase);
 }
