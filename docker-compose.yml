@@ -1,0 +1,45 @@
+# Development stack: `docker compose up --build`.
+# Passwords and the signing key below are development-only defaults. Override them through
+# environment variables or a .env file (see .env.example) for anything beyond local use.
+name: novawallet
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: novawallet
+      POSTGRES_USER: novawallet_owner
+      POSTGRES_PASSWORD: ${NOVAWALLET_OWNER_PASSWORD:-owner-dev-password}
+      NOVAWALLET_APP_PASSWORD: ${NOVAWALLET_APP_PASSWORD:-app-dev-password}
+    volumes:
+      - ./deploy/db/init:/docker-entrypoint-initdb.d:ro
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U novawallet_owner -d novawallet"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrator:
+    build: .
+    image: novawallet-api:local
+    command: ["--migrate"]
+    environment:
+      ConnectionStrings__LedgerMigrations: "Host=db;Database=novawallet;Username=novawallet_owner;Password=${NOVAWALLET_OWNER_PASSWORD:-owner-dev-password}"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: novawallet-api:local
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Ledger: "Host=db;Database=novawallet;Username=novawallet_app;Password=${NOVAWALLET_APP_PASSWORD:-app-dev-password}"
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:

@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/TestResults/
+tests/
+.git/
+.agent-harness/
+.env
+*.md
