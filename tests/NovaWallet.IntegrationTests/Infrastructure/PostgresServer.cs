@@ -12,6 +12,7 @@ internal static class PostgresServer
 {
     public const string ExternalServerVariable = "NOVAWALLET_TEST_DB";
     public const string RuntimeRole = "novawallet_app";
+    public const string OwnerRole = "novawallet_owner";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(60);
     private static readonly Lazy<Task<ServerInfo>> Server = new(StartAsync);
 
@@ -24,9 +25,11 @@ internal static class PostgresServer
             ? await StartContainerAsync()
             : external;
 
+        var ownerPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
         var runtimePassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-        await EnsureRuntimeRoleAsync(adminConnectionString, runtimePassword);
-        return new ServerInfo(adminConnectionString, runtimePassword);
+        await EnsureRoleAsync(adminConnectionString, OwnerRole, ownerPassword);
+        await EnsureRoleAsync(adminConnectionString, RuntimeRole, runtimePassword);
+        return new ServerInfo(adminConnectionString, ownerPassword, runtimePassword);
     }
 
     private static async Task<string> StartContainerAsync()
@@ -48,19 +51,20 @@ internal static class PostgresServer
         }
     }
 
-    private static async Task EnsureRuntimeRoleAsync(string adminConnectionString, string password)
+    // Mirrors deploy/db/init/01-create-roles.sh. The password is hex generated per run, so it is
+    // safe to embed; format(%L) quotes it anyway.
+    private static async Task EnsureRoleAsync(string adminConnectionString, string role, string password)
     {
         await using var connection = new NpgsqlConnection(adminConnectionString);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
-        // The password is generated per run; quote_literal keeps it safe inside the dynamic SQL.
         command.CommandText = $"""
             DO $$
             BEGIN
-                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{RuntimeRole}') THEN
-                    EXECUTE format('CREATE ROLE {RuntimeRole} LOGIN PASSWORD %L', '{password}');
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+                    EXECUTE format('CREATE ROLE {role} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD %L', '{password}');
                 ELSE
-                    EXECUTE format('ALTER ROLE {RuntimeRole} LOGIN PASSWORD %L', '{password}');
+                    EXECUTE format('ALTER ROLE {role} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD %L', '{password}');
                 END IF;
             END
             $$;
@@ -68,5 +72,5 @@ internal static class PostgresServer
         await command.ExecuteNonQueryAsync();
     }
 
-    internal sealed record ServerInfo(string AdminConnectionString, string RuntimePassword);
+    internal sealed record ServerInfo(string AdminConnectionString, string OwnerPassword, string RuntimePassword);
 }

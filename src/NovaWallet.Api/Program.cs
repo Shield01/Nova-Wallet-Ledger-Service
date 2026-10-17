@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using NovaWallet.Api.Auth;
 using NovaWallet.Api.Errors;
 using NovaWallet.Infrastructure;
 using NovaWallet.Infrastructure.Persistence;
@@ -8,9 +9,16 @@ const string MigrateArgument = "--migrate";
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (args.Contains(MigrateArgument))
+{
+    await MigrateAndExitAsync(builder);
+    return;
+}
+
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddNovaWalletProblemDetails();
+builder.Services.AddNovaWalletAuth();
 builder.Services.AddHealthChecks();
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -21,22 +29,25 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 
 var app = builder.Build();
 
-if (args.Contains(MigrateArgument))
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+app.MapDevTokenEndpoint(app.Configuration);
+app.MapControllers();
+
+app.Run();
+
+static async Task MigrateAndExitAsync(WebApplicationBuilder builder)
 {
+    using var app = builder.Build();
     var connectionString = app.Configuration.GetConnectionString(DatabaseSetup.MigrationsConnectionName)
         ?? throw new InvalidOperationException(
             $"Connection string '{DatabaseSetup.MigrationsConnectionName}' is not configured. " +
             $"Set ConnectionStrings__{DatabaseSetup.MigrationsConnectionName}.");
     await DatabaseMigrator.MigrateAsync(connectionString, app.Logger, CancellationToken.None);
-    return;
 }
-
-app.UseExceptionHandler();
-app.UseStatusCodePages();
-
-app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
-app.MapControllers();
-
-app.Run();
 
 public partial class Program;

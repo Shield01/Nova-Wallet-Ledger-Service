@@ -21,7 +21,8 @@ public sealed class TestTokens(string signingKey, string issuer, string audience
         string? overrideAudience = null,
         string? overrideSigningKey = null,
         DateTime? expires = null,
-        DateTime? notBefore = null)
+        DateTime? notBefore = null,
+        string algorithm = SecurityAlgorithms.HmacSha256)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(overrideSigningKey ?? signingKey));
         var now = DateTime.UtcNow;
@@ -33,7 +34,7 @@ public sealed class TestTokens(string signingKey, string issuer, string audience
             IssuedAt = notBefore ?? now.AddMinutes(-1),
             Expires = expires ?? now.AddMinutes(15),
             Subject = new ClaimsIdentity([new Claim("sub", subject), new Claim("scope", string.Join(' ', scopes))]),
-            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
+            SigningCredentials = new SigningCredentials(key, algorithm),
         };
         return new JsonWebTokenHandler().CreateToken(descriptor);
     }

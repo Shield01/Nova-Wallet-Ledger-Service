@@ -15,6 +15,8 @@ statements and an audit trail, in kobo, safe under concurrent requests.
 
 ## Architecture in brief
 
+Full design contract: `docs/ARCHITECTURE.md` (API, errors, money and concurrency rules, roles).
+
 - Four projects: `Domain` ← `Application` ← `Infrastructure` ← `Api`. Application never references
   EF Core or ASP.NET.
 - One use case = one application service method = one database transaction. Money moves only
