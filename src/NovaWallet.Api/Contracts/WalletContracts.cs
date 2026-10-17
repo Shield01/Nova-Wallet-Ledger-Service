@@ -13,6 +13,8 @@ public sealed class CreateWalletRequest
     public string? CustomerId { get; init; }
 }
 
+public sealed record BalanceResponse(Guid WalletId, long BalanceKobo, string Currency, DateTimeOffset AsOf);
+
 public sealed record WalletResponse(Guid WalletId, string CustomerId, string Currency, long BalanceKobo, DateTimeOffset CreatedAt)
 {
     public static WalletResponse From(Wallet wallet) =>

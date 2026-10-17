@@ -30,4 +30,18 @@ public sealed class WalletsController(WalletService wallets) : ControllerBase
         var wallet = WalletResponse.From(result.Value);
         return Results.Created($"/api/v1/wallets/{wallet.WalletId}/balance", wallet);
     }
+
+    /// <summary>Current balance of one of the caller's wallets, in kobo.</summary>
+    [HttpGet("{walletId:guid}/balance")]
+    [ProducesResponseType<BalanceResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IResult> GetBalance(Guid walletId, CancellationToken cancellationToken)
+    {
+        var result = await wallets.GetBalanceAsync(walletId, cancellationToken);
+        return result.IsSuccess
+            ? Results.Ok(new BalanceResponse(result.Value.WalletId, result.Value.BalanceKobo, result.Value.Currency, result.Value.AsOf))
+            : result.Error.ToProblem(HttpContext);
+    }
 }
