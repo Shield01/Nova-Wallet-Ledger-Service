@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using NovaWallet.Application.Abstractions;
 using NovaWallet.Application.Audit;
 using NovaWallet.Application.Idempotency;
+using NovaWallet.Application.Outbox;
 using NovaWallet.Application.Wallets;
 using NovaWallet.Domain.Errors;
 using NovaWallet.Domain.Ledger;
@@ -16,6 +17,7 @@ public sealed class TransferService(
     IWalletStore wallets,
     ILedgerStore ledger,
     IAuditTrail audit,
+    IOutbox outbox,
     ICallerContext caller,
     ICorrelationContext correlation,
     TimeProvider clock,
@@ -88,6 +90,14 @@ public sealed class TransferService(
         var posting = LedgerPosting.Move(LedgerTransactionType.Transfer, source, destination, amountKobo, caller.Subject, correlation.CorrelationId, now);
         ledger.Add(posting);
         audit.Append([.. posting.AuditRecords]);
+        outbox.Enqueue(new TransferCompleted(
+            Guid.NewGuid(),
+            posting.Transaction.Id,
+            source.Id,
+            destination.Id,
+            amountKobo,
+            now,
+            correlation.CorrelationId).ToMessage());
 
         return new TransferResult(posting.Transaction.Id, source.Id, destination.Id, amountKobo, source.BalanceKobo, now);
     }

@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using NovaWallet.Api.Outbox;
 using NovaWallet.Infrastructure.Persistence;
 using Npgsql;
 
@@ -88,6 +89,13 @@ public class NovaWalletApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
             services.AddControllers().AddApplicationPart(typeof(TestOnlyController).Assembly);
+
+            // Tests drive the outbox dispatcher directly; the poller would race them. Outbox tests
+            // that need the poller add it back.
+            foreach (var poller in services.Where(d => d.ImplementationType == typeof(OutboxPollingService)).ToList())
+            {
+                services.Remove(poller);
+            }
         });
     }
 
