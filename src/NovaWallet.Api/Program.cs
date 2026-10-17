@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using NovaWallet.Api.Auth;
 using NovaWallet.Api.Errors;
 using NovaWallet.Api.Observability;
+using NovaWallet.Application;
 using NovaWallet.Infrastructure;
 using NovaWallet.Infrastructure.Persistence;
 
@@ -18,6 +19,7 @@ if (args.Contains(MigrateArgument))
 
 builder.AddNovaWalletLogging();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddNovaWalletProblemDetails();
 builder.Services.AddNovaWalletAuth();

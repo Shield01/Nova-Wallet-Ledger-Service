@@ -30,6 +30,7 @@ public class NovaWalletApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
         ["Auth:Issuer"] = TestIssuer,
         ["Auth:Audience"] = TestAudience,
         ["Auth:DevIssuer:Enabled"] = "true",
+        ["Logging:Console:LogLevel:Default"] = "Warning",
     };
 
     public string DatabaseName { get; } = $"nw_test_{Guid.NewGuid():N}";
