@@ -39,6 +39,14 @@ public sealed class WalletService(IWalletStore wallets, ICallerContext caller, T
             : new Error(ErrorCodes.WalletNotFound, "No wallet with this id belongs to you.");
     }
 
+    public async Task<Result<WalletBalance>> GetBalanceAsync(Guid walletId, CancellationToken cancellationToken)
+    {
+        var owned = await GetOwnedAsync(walletId, cancellationToken);
+        return owned.IsSuccess
+            ? new WalletBalance(owned.Value.Id, owned.Value.BalanceKobo, Wallet.Currency, clock.GetUtcNow())
+            : owned.Error;
+    }
+
     private static Error AlreadyExists(Wallet existing) =>
         new Error(ErrorCodes.WalletAlreadyExists, "This customer already has a wallet.")
             .With(ExistingWalletIdExtension, existing.Id);
