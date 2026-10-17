@@ -35,7 +35,10 @@ public sealed partial class UnhandledExceptionHandler(
     {
         for (var current = exception; current is not null; current = current.InnerException)
         {
-            if (current is NpgsqlException { IsTransient: true } or System.Net.Sockets.SocketException or TimeoutException)
+            if (current is NpgsqlException { IsTransient: true }
+                or PostgresException { SqlState: PostgresErrorCodes.LockNotAvailable }
+                or System.Net.Sockets.SocketException
+                or TimeoutException)
             {
                 return true;
             }
