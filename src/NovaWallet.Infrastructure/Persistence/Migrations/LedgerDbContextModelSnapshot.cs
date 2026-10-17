@@ -22,6 +22,111 @@ namespace NovaWallet.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("NovaWallet.Domain.Audit.AuditRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("actor");
+
+                    b.Property<long>("AmountKobo")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_kobo");
+
+                    b.Property<long>("BalanceAfterKobo")
+                        .HasColumnType("bigint")
+                        .HasColumnName("balance_after_kobo");
+
+                    b.Property<long>("BalanceBeforeKobo")
+                        .HasColumnType("bigint")
+                        .HasColumnName("balance_before_kobo");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transaction_id");
+
+                    b.Property<Guid>("WalletId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wallet_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_audit_log");
+
+                    b.HasIndex("OccurredAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_audit_log_occurred_at_id");
+
+                    b.HasIndex("WalletId", "OccurredAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_audit_log_wallet_id_occurred_at_id");
+
+                    b.ToTable("audit_log", (string)null);
+                });
+
+            modelBuilder.Entity("NovaWallet.Domain.Idempotency.IdempotencyRecord", b =>
+                {
+                    b.Property<string>("CallerId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("caller_id");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("request_hash")
+                        .IsFixedLength();
+
+                    b.Property<string>("ResponseBody")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("response_body");
+
+                    b.HasKey("CallerId", "IdempotencyKey")
+                        .HasName("pk_idempotency_records");
+
+                    b.ToTable("idempotency_records", (string)null);
+                });
+
             modelBuilder.Entity("NovaWallet.Domain.Wallets.Wallet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -60,6 +165,16 @@ namespace NovaWallet.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_wallets_kind_matches_customer", "(kind = 'SYSTEM' AND customer_id IS NULL) OR (kind = 'CUSTOMER' AND customer_id IS NOT NULL)");
                         });
+                });
+
+            modelBuilder.Entity("NovaWallet.Domain.Audit.AuditRecord", b =>
+                {
+                    b.HasOne("NovaWallet.Domain.Wallets.Wallet", null)
+                        .WithMany()
+                        .HasForeignKey("WalletId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_audit_log_wallet_wallet_id");
                 });
 #pragma warning restore 612, 618
         }

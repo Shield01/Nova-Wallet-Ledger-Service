@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NovaWallet.Application.Abstractions;
+using NovaWallet.Application.Audit;
+using NovaWallet.Application.Idempotency;
 using NovaWallet.Application.Wallets;
 using NovaWallet.Infrastructure.Persistence;
 using NovaWallet.Infrastructure.Persistence.Stores;
@@ -18,7 +21,11 @@ public static class DependencyInjection
                     $"Set ConnectionStrings__{DatabaseSetup.RuntimeConnectionName}.");
             DatabaseSetup.Configure(options, connectionString);
         });
+        services.AddOptions<DatabaseSettings>().BindConfiguration(DatabaseSettings.SectionName);
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IWalletStore, WalletStore>();
+        services.AddScoped<IAuditTrail, AuditTrail>();
+        services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         return services;
     }
 }
