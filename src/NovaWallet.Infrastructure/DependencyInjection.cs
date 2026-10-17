@@ -23,6 +23,7 @@ public static class DependencyInjection
             DatabaseSetup.Configure(options, connectionString);
         });
         services.AddOptions<DatabaseSettings>().BindConfiguration(DatabaseSettings.SectionName);
+        services.AddOptions<LimitSettings>().BindConfiguration(LimitSettings.SectionName);
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IWalletStore, WalletStore>();
         services.AddScoped<IAuditTrail, AuditTrail>();

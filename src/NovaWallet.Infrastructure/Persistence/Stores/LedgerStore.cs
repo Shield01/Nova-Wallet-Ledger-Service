@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using NovaWallet.Application.Ledger;
 using NovaWallet.Domain.Ledger;
 
@@ -9,5 +10,13 @@ public sealed class LedgerStore(LedgerDbContext db) : ILedgerStore
     {
         db.Add(posting.Transaction);
         db.AddRange(posting.Entries);
+    }
+
+    public async Task<long> OutboundTotalAsync(Guid walletId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        var debits = await db.Set<LedgerEntry>()
+            .Where(e => e.WalletId == walletId && e.Type == LedgerEntryType.TransferOut && e.CreatedAt >= from && e.CreatedAt < to)
+            .SumAsync(e => (long?)e.AmountKobo, cancellationToken) ?? 0;
+        return checked(-debits);
     }
 }
