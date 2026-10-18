@@ -31,6 +31,9 @@ public class NovaWalletApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
         ["Auth:Audience"] = TestAudience,
         ["Auth:DevIssuer:Enabled"] = "true",
         ["Logging:Console:LogLevel:Default"] = "Warning",
+
+        // Money tests send far more than ten transfers a minute per customer; rate-limit tests lower it.
+        ["RateLimiting:Transfers:PermitLimit"] = "1000000",
     };
 
     public string DatabaseName { get; } = $"nw_test_{Guid.NewGuid():N}";

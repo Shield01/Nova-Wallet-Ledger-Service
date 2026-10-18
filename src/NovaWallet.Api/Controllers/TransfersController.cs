@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using NovaWallet.Api.Auth;
 using NovaWallet.Api.Contracts;
 using NovaWallet.Api.Errors;
 using NovaWallet.Api.Idempotency;
+using NovaWallet.Api.RateLimiting;
 using NovaWallet.Application.Ledger;
 
 namespace NovaWallet.Api.Controllers;
@@ -19,6 +21,7 @@ public sealed class TransfersController(TransferService transfers) : ControllerB
     /// </summary>
     [HttpPost]
     [RequiresIdempotencyKey]
+    [EnableRateLimiting(TransferRateLimiting.PolicyName)]
     [ProducesResponseType<TransferResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
@@ -26,6 +29,7 @@ public sealed class TransfersController(TransferService transfers) : ControllerB
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
     public async Task<IResult> Transfer(TransferRequest request, CancellationToken cancellationToken)
     {

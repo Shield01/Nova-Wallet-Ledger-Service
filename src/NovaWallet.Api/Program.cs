@@ -3,6 +3,7 @@ using NovaWallet.Api.Auth;
 using NovaWallet.Api.Errors;
 using NovaWallet.Api.Observability;
 using NovaWallet.Api.OpenApi;
+using NovaWallet.Api.RateLimiting;
 using NovaWallet.Application;
 using NovaWallet.Infrastructure;
 using NovaWallet.Infrastructure.Persistence;
@@ -23,6 +24,7 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddNovaWalletProblemDetails();
 builder.Services.AddNovaWalletAuth();
+builder.Services.AddTransferRateLimiting();
 builder.Services.AddNovaWalletHealth();
 builder.Services.AddNovaWalletOpenApi();
 builder.Services.AddControllers().AddJsonOptions(options =>
@@ -39,6 +41,7 @@ app.UseStatusCodePages();
 app.UseNovaWalletOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapNovaWalletHealth();
 app.MapDevTokenEndpoint(app.Configuration);
