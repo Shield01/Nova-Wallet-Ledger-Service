@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using NovaWallet.Api.Auth;
 using NovaWallet.Api.Errors;
 using NovaWallet.Api.Observability;
+using NovaWallet.Api.OpenApi;
 using NovaWallet.Application;
 using NovaWallet.Infrastructure;
 using NovaWallet.Infrastructure.Persistence;
@@ -24,6 +25,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddNovaWalletProblemDetails();
 builder.Services.AddNovaWalletAuth();
 builder.Services.AddHealthChecks();
+builder.Services.AddNovaWalletOpenApi();
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     // The web defaults accept numbers written as strings; amounts must be real JSON integers.
@@ -35,6 +37,7 @@ var app = builder.Build();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseNovaWalletOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 

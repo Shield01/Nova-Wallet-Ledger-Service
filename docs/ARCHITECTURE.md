@@ -7,8 +7,8 @@ code that needs it.
 ## System shape
 
 A single ASP.NET Core 8 service over PostgreSQL 16. HTTP requests pass through middleware
-(correlation ID → exception handling → status-code problems → authentication → authorisation →
-rate limiting) into controllers. Controllers validate input, then call one application service per
+(correlation ID → exception handling → status-code problems → OpenAPI document and UI →
+authentication → authorisation → rate limiting) into controllers. Controllers validate input, then call one application service per
 use case. The service runs the whole use case inside **one database transaction**: lock the wallet
 rows, read the clock, check the rules, post ledger entries, write audit records, write the outbox
 message, store the idempotency record, commit. Nothing touching money happens outside that
@@ -162,7 +162,7 @@ Numbers written as strings are rejected.
 | `GET /api/v1/audit?walletId=&limit=&cursor=` | scope `audit:read` | — | 200 `{ items: [AuditEntry], nextCursor }` |
 | `POST /dev/token` | anonymous; Development only | `{ subject, scopes: [string] }` | 200 `{ accessToken, tokenType: "Bearer", expiresAt }` |
 | `GET /health/live`, `GET /health/ready` | anonymous | — | 200 / 503 |
-| `GET /swagger`, `GET /swagger/v1/swagger.json` | anonymous | — | 200 |
+| `GET /swagger`, `GET /swagger/v1/swagger.json` | anonymous; only when `OpenApi:Enabled` (otherwise unmapped: see `NOT_FOUND` under Errors) | — | 200 |
 
 - `Wallet`: `{ walletId, customerId, currency: "NGN", balanceKobo, createdAt }`.
 - `StatementEntry`: `{ entryId, transactionId, type: CREDIT|TRANSFER_IN|TRANSFER_OUT, direction:
