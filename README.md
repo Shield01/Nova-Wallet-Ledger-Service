@@ -421,7 +421,7 @@ as the restricted runtime role. To use an existing PostgreSQL server instead of 
 | Suite | Count | Covers |
 |---|---|---|
 | Unit | 18 | Layer dependencies, error codes, idempotency key rules, WAT day boundaries |
-| Integration | 241 | Every endpoint and error code, auth and startup guards, idempotency races, the audit trail's database protection, outbox delivery, readiness, rate limiting, the load test |
+| Integration | 242 | Every endpoint and error code, auth and startup guards, idempotency races, the audit trail's database protection, outbox delivery, readiness, rate limiting, the load test |
 
 After every test that moves money, the suite checks the ledger invariants in SQL: every
 transaction sums to zero, every balance equals the sum of its entries, no customer balance is
