@@ -22,6 +22,7 @@ public class NovaWalletApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
 {
     public const string TestIssuer = "novawallet-dev-issuer";
     public const string TestAudience = "novawallet-api";
+    public const int MaxRuntimePoolSize = 50;
 
     private static readonly string RunSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -62,7 +63,12 @@ public class NovaWalletApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
             """);
 
         OwnerConnectionString = WithDatabase(server.AdminConnectionString, PostgresServer.OwnerRole, server.OwnerPassword);
-        RuntimeConnectionString = WithDatabase(server.AdminConnectionString, PostgresServer.RuntimeRole, server.RuntimePassword);
+        RuntimeConnectionString = new NpgsqlConnectionStringBuilder(WithDatabase(server.AdminConnectionString, PostgresServer.RuntimeRole, server.RuntimePassword))
+        {
+            // Several hosts share one server; past this, requests queue for a connection
+            // instead of pushing the server over its connection limit.
+            MaxPoolSize = MaxRuntimePoolSize,
+        }.ConnectionString;
         _settings["ConnectionStrings:Ledger"] = RuntimeConnectionString;
 
         await DatabaseMigrator.MigrateAsync(OwnerConnectionString, NullLogger.Instance, CancellationToken.None);
