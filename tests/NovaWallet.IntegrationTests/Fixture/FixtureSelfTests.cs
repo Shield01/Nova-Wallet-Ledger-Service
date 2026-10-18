@@ -27,6 +27,22 @@ public class FixtureSelfTests(NovaWalletApiFactory factory) : IClassFixture<Nova
     }
 
     [Fact]
+    public async Task Test_server_and_pools_leave_room_for_parallel_test_classes()
+    {
+        await using var connection = new NpgsqlConnection(factory.AdminConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SHOW max_connections", connection);
+        var maxConnections = int.Parse((string)(await command.ExecuteScalarAsync())!);
+
+        Assert.Equal(NovaWalletApiFactory.MaxRuntimePoolSize, new NpgsqlConnectionStringBuilder(factory.RuntimeConnectionString).MaxPoolSize);
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(PostgresServer.ExternalServerVariable)))
+        {
+            // Only when the fixture started the server; an external server is configured by its owner.
+            Assert.Equal(PostgresServer.MaxConnections, maxConnections);
+        }
+    }
+
+    [Fact]
     public async Task Runtime_role_can_connect_to_the_test_database()
     {
         await using var connection = new NpgsqlConnection(factory.RuntimeConnectionString);
