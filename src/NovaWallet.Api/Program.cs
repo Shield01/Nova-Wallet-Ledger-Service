@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using NovaWallet.Api.Auth;
 using NovaWallet.Api.Errors;
 using NovaWallet.Api.Observability;
@@ -24,7 +23,7 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddNovaWalletProblemDetails();
 builder.Services.AddNovaWalletAuth();
-builder.Services.AddHealthChecks();
+builder.Services.AddNovaWalletHealth();
 builder.Services.AddNovaWalletOpenApi();
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -41,7 +40,7 @@ app.UseNovaWalletOpenApi();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+app.MapNovaWalletHealth();
 app.MapDevTokenEndpoint(app.Configuration);
 app.MapControllers();
 

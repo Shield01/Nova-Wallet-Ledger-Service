@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<ILedgerStore, LedgerStore>();
+        services.AddScoped<DatabaseProbe>();
         return services;
     }
 }
