@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Format, build, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore NovaWallet.sln
+      - run: dotnet format NovaWallet.sln --verify-no-changes --no-restore
+      - run: dotnet build NovaWallet.sln -c Release --no-restore
+      # Integration tests start PostgreSQL 16 with Testcontainers on the runner's Docker.
+      - run: dotnet test NovaWallet.sln -c Release --no-build --logger "console;verbosity=normal"
+
+  compose:
+    name: docker compose up + smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up --build -d
+      - run: ./scripts/smoke-test.sh
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
