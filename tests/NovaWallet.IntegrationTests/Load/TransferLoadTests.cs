@@ -69,6 +69,7 @@ public class TransferLoadTests(NovaWalletApiFactory factory, ITestOutputHelper o
         // Scoped to this run's wallets: the class database is shared with the other test here.
         var wallets = string.Join(",", customers.Select(c => $"'{c.Wallet}'"));
         Assert.Equal((long)succeededKeys, await ScalarAsync(connection, $"SELECT count(*) FROM ledger_transactions WHERE type = 'TRANSFER' AND source_wallet_id IN ({wallets})"));
+        Assert.Equal((long)succeededKeys, await ScalarAsync(connection, $"SELECT count(*) FROM outbox_messages WHERE type = 'TransferCompleted' AND (payload->>'sourceWalletId')::uuid IN ({wallets})"));
         Assert.Equal(0L, await ScalarAsync(connection, $"""
             SELECT count(*) FROM (
               SELECT t.id FROM ledger_transactions t LEFT JOIN audit_log a ON a.transaction_id = t.id

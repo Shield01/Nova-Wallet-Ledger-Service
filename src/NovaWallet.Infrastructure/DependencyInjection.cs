@@ -6,7 +6,9 @@ using NovaWallet.Application.Abstractions;
 using NovaWallet.Application.Audit;
 using NovaWallet.Application.Idempotency;
 using NovaWallet.Application.Ledger;
+using NovaWallet.Application.Outbox;
 using NovaWallet.Application.Wallets;
+using NovaWallet.Infrastructure.Outbox;
 using NovaWallet.Infrastructure.Persistence;
 using NovaWallet.Infrastructure.Persistence.Stores;
 
@@ -34,6 +36,15 @@ public static class DependencyInjection
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddScoped<ILedgerStore, LedgerStore>();
         services.AddScoped<DatabaseProbe>();
+        services.AddOptions<OutboxSettings>()
+            .BindConfiguration(OutboxSettings.SectionName)
+            .Validate(
+                s => s.PollIntervalMilliseconds >= OutboxSettings.MinPollIntervalMilliseconds && s.MaxAttempts >= 1 && s.BatchSize >= 1,
+                $"Outbox:PollIntervalMilliseconds must be at least {OutboxSettings.MinPollIntervalMilliseconds}; Outbox:MaxAttempts and Outbox:BatchSize at least 1.")
+            .ValidateOnStart();
+        services.AddScoped<IOutbox, OutboxStore>();
+        services.AddScoped<OutboxDispatcher>();
+        services.AddSingleton<IEventPublisher, LoggingEventPublisher>();
         return services;
     }
 }

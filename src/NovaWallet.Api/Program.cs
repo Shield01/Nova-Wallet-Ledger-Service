@@ -3,6 +3,7 @@ using NovaWallet.Api.Auth;
 using NovaWallet.Api.Errors;
 using NovaWallet.Api.Observability;
 using NovaWallet.Api.OpenApi;
+using NovaWallet.Api.Outbox;
 using NovaWallet.Api.RateLimiting;
 using NovaWallet.Application;
 using NovaWallet.Infrastructure;
@@ -25,6 +26,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddNovaWalletProblemDetails();
 builder.Services.AddNovaWalletAuth();
 builder.Services.AddTransferRateLimiting();
+builder.Services.AddHostedService<OutboxPollingService>();
 builder.Services.AddNovaWalletHealth();
 builder.Services.AddNovaWalletOpenApi();
 builder.Services.AddControllers().AddJsonOptions(options =>

@@ -146,6 +146,9 @@ unknown or not owned) → 422 `SAME_WALLET_TRANSFER` → 422 `DESTINATION_WALLET
 - Delivery is at least once; consumers de-duplicate on `eventId`. A failed publish increments
   `attempts` and records `last_error`; after `Outbox:MaxAttempts` (default 10) the dispatcher stops
   retrying that message and logs an error.
+- A poll claims, publishes and records in one transaction, so claimed rows stay locked while
+  publishing. That is fine for the log publisher; a real broker should be published to outside the
+  transaction with a claim lease (README).
 
 ## API contract
 
@@ -242,8 +245,8 @@ environment. Keys: `ConnectionStrings:Ledger`, `ConnectionStrings:LedgerMigratio
 `Limits:DailyOutboundKobo`, `Database:LockTimeoutMilliseconds` (5000),
 `Health:ReadinessTimeoutMilliseconds` (3000), `Health:ReadinessCacheMilliseconds` (1000),
 `RateLimiting:Transfers:PermitLimit` (10), `RateLimiting:Transfers:WindowSeconds` (60),
-`Outbox:PollIntervalMilliseconds` (1000), `Outbox:MaxAttempts` (10), `OpenApi:Enabled` (true
-except in Production).
+`Outbox:PollIntervalMilliseconds` (1000), `Outbox:MaxAttempts` (10), `Outbox:BatchSize` (100),
+`OpenApi:Enabled` (true except in Production).
 
 ## Database and startup
 
@@ -259,7 +262,7 @@ except in Production).
   | `ledger_transactions`, `ledger_entries` | SELECT, INSERT (the ledger is append-only) |
   | `audit_log` | SELECT, INSERT |
   | `idempotency_records` | SELECT, INSERT |
-  | `outbox_messages` | SELECT, INSERT, UPDATE |
+  | `outbox_messages` | SELECT, INSERT, UPDATE of `published_at`, `attempts`, `last_error` only |
   | sequences | USAGE, SELECT |
 
 - Migrations are EF Core migrations in Infrastructure. A one-shot `migrator` compose service runs
