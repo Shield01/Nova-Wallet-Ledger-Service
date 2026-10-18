@@ -263,7 +263,7 @@ sequenceDiagram
   end
   S->>P: SAVEPOINT
   S->>P: SELECT … FOR UPDATE both wallets, ascending id
-  S->>S: read the clock once; check ownership, funds, daily limit
+  S->>S: read the clock once, then check ownership, funds, daily limit
   S->>P: INSERT transaction + 2 entries, UPDATE balances
   S->>P: INSERT 2 audit rows, 1 outbox row, the idempotency record
   S->>P: COMMIT
