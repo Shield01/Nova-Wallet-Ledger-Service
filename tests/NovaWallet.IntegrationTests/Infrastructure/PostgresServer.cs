@@ -13,6 +13,13 @@ internal static class PostgresServer
     public const string ExternalServerVariable = "NOVAWALLET_TEST_DB";
     public const string RuntimeRole = "novawallet_app";
     public const string OwnerRole = "novawallet_owner";
+
+    /// <summary>
+    /// Test classes run in parallel, each with its own API host and connection pool, against this
+    /// one server. The default of 100 connections runs out on slow CI runners (PostgreSQL then
+    /// refuses clients and the API answers 503).
+    /// </summary>
+    public const int MaxConnections = 300;
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(60);
     private static readonly Lazy<Task<ServerInfo>> Server = new(StartAsync);
 
@@ -36,7 +43,9 @@ internal static class PostgresServer
     {
         try
         {
-            var container = new PostgreSqlBuilder("postgres:16-alpine").Build();
+            var container = new PostgreSqlBuilder("postgres:16-alpine")
+                .WithCommand("-c", $"max_connections={MaxConnections}")
+                .Build();
             using var timeout = new CancellationTokenSource(StartupTimeout);
             await container.StartAsync(timeout.Token);
             AppDomain.CurrentDomain.ProcessExit += (_, _) => container.DisposeAsync().AsTask().GetAwaiter().GetResult();
